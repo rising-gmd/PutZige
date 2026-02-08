@@ -69,11 +69,12 @@ namespace PutZige.Application.Tests.Validators
         }
 
         [Fact]
-        public void ResendVerificationRequestValidator_InvalidEmailFormat_FailsValidation()
+        public void ResendVerificationRequestValidator_NonEmailToken_PassesValidation()
         {
             var req = new ResendVerificationRequest("not-an-email");
             var result = _resend.Validate(req);
-            result.IsValid.Should().BeFalse();
+            // Resend now accepts a token (may contain arbitrary characters) so any non-empty string is valid
+            result.IsValid.Should().BeTrue();
         }
     }
 }

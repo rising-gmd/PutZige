@@ -57,16 +57,37 @@ namespace PutZige.Application.Services
             _backgroundJobDispatcher = backgroundJobDispatcher ?? new NoOpBackgroundJobDispatcher();
         }
 
+        /// <summary>
+        /// Resends verification email by extracting email from the composite token.
+        /// </summary>
+public async Task ResendVerificationEmailByTokenAsync(string compositeToken, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(compositeToken))
+                throw new AppException(ResponseCodes.TOKEN_REQUIRED, ErrorMessages.Validation.TokenRequired);
+
+            // Extract email from token
+            string email;
+            try
+            {
+                email = _hashingService.ExtractEmailFromVerificationToken(compositeToken);
+            }
+            catch (ArgumentException)
+            {
+                throw new AppException(ResponseCodes.TOKEN_INVALID, ErrorMessages.Email.TokenInvalid);
+            }
+
+            // Reuse existing logic
+            await ResendVerificationEmailAsync(email, ct);
+        }
+
         public async Task<bool> VerifyEmailAsync(string token, CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(token)) throw new AppException(ResponseCodes.TOKEN_REQUIRED, ErrorMessages.Validation.TokenRequired);
 
-            // Resolve user by token first to validate token, expiry and current verification state
             var user = await _userRepository.GetByVerificationTokenAsync(token, ct);
 
             if (user == null)
             {
-                // Token does not map to any user
                 throw new AppException(ResponseCodes.TOKEN_INVALID, ErrorMessages.Email.TokenInvalid);
             }
 
@@ -75,15 +96,14 @@ namespace PutZige.Application.Services
             if (!user.EmailVerificationTokenExpiry.HasValue || user.EmailVerificationTokenExpiry.Value <= _dateTimeProvider.UtcNow)
                 throw new AppException(ResponseCodes.TOKEN_EXPIRED, ErrorMessages.Email.TokenExpired);
 
-            // Perform an atomic update using the Dapper repository when available to avoid race conditions where multiple requests try to verify the same token.
             int rows =  await _dapperUserRepository.VerifyEmailByTokenAsync(token, ct).ConfigureAwait(false);
+
             if (rows == 0)
             {
                 // No rows updated - likely already verified by a concurrent request
                 throw new AppException(ResponseCodes.EMAIL_ALREADY_VERIFIED, ErrorMessages.Email.AlreadyVerified);
             }
 
-            // Reflect change in the in-memory user for callers/tests
             user.IsEmailVerified = true;
             user.EmailVerificationToken = null;
             user.EmailVerificationTokenExpiry = null;
@@ -108,7 +128,7 @@ namespace PutZige.Application.Services
                 throw new AppException(ResponseCodes.TOO_MANY_RESEND_ATTEMPTS, ErrorMessages.Email.TooManyResendAttempts);
             }
 
-            var token = _hashingService.GenerateSecureToken(32);
+            var token = _hashingService.GenerateEmailVerificationToken(user.Email, 32);
             user.EmailVerificationToken = token;
             user.EmailVerificationTokenExpiry = _dateTimeProvider.UtcNow.AddDays(AppConstants.Security.EmailVerificationTokenExpirationDays);
             user.EmailVerificationSentCount++;

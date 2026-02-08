@@ -7,6 +7,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
+using System.Text;
 using PutZige.Application.Common.Constants;
 using PutZige.Application.Common.Messages;
 using PutZige.Application.Interfaces;
@@ -37,6 +38,15 @@ namespace PutZige.Application.Tests.Services
                 System.Security.Cryptography.RandomNumberGenerator.Fill(bytes);
                 return Convert.ToBase64String(bytes).Replace("+","-").Replace("/","_").TrimEnd('=');
             });
+            _hashing.Setup(h => h.GenerateEmailVerificationToken(It.IsAny<string>(), It.IsAny<int>()))
+                .Returns((string emailArg, int len) =>
+                {
+                    var bytes = new byte[Math.Max(1, len)];
+                    System.Security.Cryptography.RandomNumberGenerator.Fill(bytes);
+                    var random = Convert.ToBase64String(bytes).Replace("+","-").Replace("/","_").TrimEnd('=');
+                    var encodedEmail = Convert.ToBase64String(Encoding.UTF8.GetBytes(emailArg)).Replace("+","-").Replace("/","_").TrimEnd('=');
+                    return $"{random}.{encodedEmail}";
+                });
             _hashing.Setup(h => h.HashAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((string s, CancellationToken ct) => new PutZige.Application.DTOs.HashedValue("hash-"+s, "salt-"+s));
             _uow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
             _mapper.Setup(m => m.Map<RegisterUserResponse>(It.IsAny<User>())).Returns((User u) => new RegisterUserResponse
@@ -191,7 +201,12 @@ namespace PutZige.Application.Tests.Services
 
             // Assert
             captured.Should().NotBeNull();
-            var b64 = captured!.EmailVerificationToken!.Replace('-', '+').Replace('_', '/');
+            // Extract random portion before the dot
+            var composite = captured!.EmailVerificationToken!;
+            var parts = composite.Split('.', 2);
+            parts.Length.Should().Be(2);
+            var randomPart = parts[0];
+            var b64 = randomPart.Replace('-', '+').Replace('_', '/');
             // Restore padding for base64 if trimmed
             switch (b64.Length % 4)
             {

@@ -7,6 +7,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
+using System.Text;
 using PutZige.Application.Common.Constants;
 using PutZige.Application.Common.Messages;
 using PutZige.Application.Interfaces;
@@ -38,6 +39,13 @@ namespace PutZige.Application.Tests.Services
             _mockDateTime.Setup(d => d.UtcNow).Returns(() => DateTime.UtcNow);
 
             _mockHashingService.Setup(h => h.GenerateSecureToken(It.IsAny<int>())).Returns((int len) => "token-" + Guid.NewGuid().ToString("N").Substring(0, Math.Max(32, len)));
+            _mockHashingService.Setup(h => h.GenerateEmailVerificationToken(It.IsAny<string>(), It.IsAny<int>()))
+                .Returns((string emailArg, int len) =>
+                {
+                    var random = "token-" + Guid.NewGuid().ToString("N").Substring(0, Math.Max(32, len));
+                    var encodedEmail = Convert.ToBase64String(Encoding.UTF8.GetBytes(emailArg)).Replace("+", "-").Replace("/", "_").TrimEnd('=');
+                    return $"{random}.{encodedEmail}";
+                });
             _uow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
         }
 

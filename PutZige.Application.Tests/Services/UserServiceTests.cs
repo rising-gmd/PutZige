@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -46,6 +47,13 @@ namespace PutZige.Application.Tests.Services
             _mockDateTime.Setup(d => d.UtcNow).Returns(() => _fixedNow);
 
             _mockHashingService.Setup(h => h.GenerateSecureToken(It.IsAny<int>())).Returns(() => Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace("+","-").Replace("/","_").TrimEnd('='));
+            _mockHashingService.Setup(h => h.GenerateEmailVerificationToken(It.IsAny<string>(), It.IsAny<int>()))
+                .Returns((string emailArg, int len) =>
+                {
+                    var random = Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace("+","-").Replace("/","_").TrimEnd('=');
+                    var encodedEmail = Convert.ToBase64String(Encoding.UTF8.GetBytes(emailArg)).Replace("+","-").Replace("/","_").TrimEnd('=');
+                    return $"{random}.{encodedEmail}";
+                });
             _mockHashingService.Setup(h => h.HashAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((string s, CancellationToken ct) => new HashedValue("hash-"+s, "salt-"+s));
 
             // Initialize system under test

@@ -69,8 +69,8 @@ namespace PutZige.Application.Services
                 throw new AppException(ResponseCodes.USERNAME_TAKEN, ErrorMessages.Authentication.UsernameAlreadyTaken);
             }
 
-            // Create a cryptographically secure verification token
-            var token = _hashingService.GenerateSecureToken(32);
+            // Create a cryptographically secure composite verification token that embeds email
+            var token = _hashingService.GenerateEmailVerificationToken(email, 32);
 
             // Hash password
             var hashed = await _hashingService.HashAsync(password, ct);

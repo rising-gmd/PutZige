@@ -11,5 +11,6 @@ namespace PutZige.Application.Interfaces
         Task<RefreshTokenResponse> RefreshTokenAsync(string refreshToken, CancellationToken ct = default);
         Task<bool> VerifyEmailAsync(string token, CancellationToken ct = default);
         Task ResendVerificationEmailAsync(string email, CancellationToken ct = default);
+        Task ResendVerificationEmailByTokenAsync(string compositeToken, CancellationToken ct = default);
     }
 }
