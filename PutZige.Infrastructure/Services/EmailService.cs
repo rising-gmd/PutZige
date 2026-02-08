@@ -82,7 +82,7 @@ public sealed class EmailService : IEmailService
         }
 
         var tokenEncoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(verificationToken));
-        var verificationLink = $"{_settings.VerificationLinkBaseUrl}?email={Uri.EscapeDataString(toEmail)}&token={Uri.EscapeDataString(tokenEncoded)}";
+        var verificationLink = $"{_settings.VerificationLinkBaseUrl}?token={Uri.EscapeDataString(tokenEncoded)}";
 
 
         var expiryHours = TimeSpan.FromDays(1).TotalHours; // keep default until constants wired

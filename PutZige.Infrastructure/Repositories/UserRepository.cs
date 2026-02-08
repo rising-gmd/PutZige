@@ -70,4 +70,22 @@ public class UserRepository : Repository<User>, IUserRepository
         // We cannot directly compare plaintext refreshToken to stored hash. Return user with session if session exists; calling code must verify token with hashing service.
         return await _dbSet.Include(u => u.Session).FirstOrDefaultAsync(u => u.Session != null && u.Session.RefreshTokenHash != null, ct).ConfigureAwait(false);
     }
+
+    /// <inheritdoc/>
+    public async Task<User?> GetByVerificationTokenAsync(string token, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(token)) return null;
+        return await _dbSet.AsNoTracking().FirstOrDefaultAsync(u => u.EmailVerificationToken == token, ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc/>
+    public async Task<int> VerifyEmailByTokenAsync(string token, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(token)) return 0;
+
+        // Atomic update: only set IsEmailVerified = true when token matches and IsEmailVerified is false
+        // Use parameterized SQL for atomic update. Table/column quoting depends on provider; use EF parameters instead.
+        var result = await _context.Database.ExecuteSqlInterpolatedAsync($"UPDATE Users SET IsEmailVerified = TRUE, EmailVerificationToken = NULL, EmailVerificationTokenExpiry = NULL WHERE EmailVerificationToken = {token} AND IsEmailVerified = FALSE", ct).ConfigureAwait(false);
+        return result;
+    }
 }

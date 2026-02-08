@@ -62,29 +62,37 @@ namespace PutZige.Application.Services
         {
         }
 
-        public async Task<bool> VerifyEmailAsync(string email, string token, CancellationToken ct = default)
+        public async Task<bool> VerifyEmailAsync(string token, CancellationToken ct = default)
         {
-            if (string.IsNullOrWhiteSpace(email)) throw new AppException(ResponseCodes.EMAIL_REQUIRED, ErrorMessages.Validation.EmailRequired);
-
             if (string.IsNullOrWhiteSpace(token)) throw new AppException(ResponseCodes.TOKEN_REQUIRED, ErrorMessages.Validation.TokenRequired);
 
-            var user = await _userRepository.GetByEmailAsync(email, ct);
+            // Resolve user by token first to validate token, expiry and current verification state
+            var user = await _userRepository.GetByVerificationTokenAsync(token, ct);
 
-            if (user == null) throw new KeyNotFoundException(ErrorMessages.General.ResourceNotFound);
+            if (user == null)
+            {
+                // Token does not map to any user
+                throw new AppException(ResponseCodes.TOKEN_INVALID, ErrorMessages.Email.TokenInvalid);
+            }
 
             if (user.IsEmailVerified) throw new AppException(ResponseCodes.EMAIL_ALREADY_VERIFIED, ErrorMessages.Email.AlreadyVerified);
-
-            if (string.IsNullOrWhiteSpace(user.EmailVerificationToken) || user.EmailVerificationToken != token)
-                throw new AppException(ResponseCodes.TOKEN_INVALID, ErrorMessages.Email.TokenInvalid);
 
             if (!user.EmailVerificationTokenExpiry.HasValue || user.EmailVerificationTokenExpiry.Value <= _dateTimeProvider.UtcNow)
                 throw new AppException(ResponseCodes.TOKEN_EXPIRED, ErrorMessages.Email.TokenExpired);
 
+            // Perform an atomic update to avoid race conditions where multiple requests try to verify the same token.
+            var rows = await _userRepository.VerifyEmailByTokenAsync(token, ct);
+
+            if (rows == 0)
+            {
+                // No rows updated - likely already verified by a concurrent request
+                throw new AppException(ResponseCodes.EMAIL_ALREADY_VERIFIED, ErrorMessages.Email.AlreadyVerified);
+            }
+
+            // Reflect change in the in-memory user for callers/tests
             user.IsEmailVerified = true;
             user.EmailVerificationToken = null;
             user.EmailVerificationTokenExpiry = null;
-
-            await _unitOfWork.SaveChangesAsync(ct);
 
             _logger?.LogInformation("Email verified for user {Email}", user.Email);
 

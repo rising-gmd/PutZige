@@ -50,7 +50,7 @@ namespace PutZige.API.Controllers
         [HttpPost("verify-email")]
         public async Task<ActionResult<ApiResponse<object>>> VerifyEmail([FromBody] PutZige.Application.DTOs.Auth.VerifyEmailRequest request, CancellationToken ct)
         {
-            await _authService.VerifyEmailAsync(request.Email, request.Token, ct);
+            await _authService.VerifyEmailAsync(request.Token, ct);
             return Success<object>(null, ResponseCodes.EMAIL_VERIFIED, SuccessMessages.Authentication.EmailVerified);
         }
 
