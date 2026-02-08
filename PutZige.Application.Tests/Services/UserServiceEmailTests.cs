@@ -25,11 +25,13 @@ namespace PutZige.Application.Tests.Services
         private readonly Mock<IUnitOfWork> _uow = new();
         private readonly Mock<IMapper> _mapper = new();
         private readonly Mock<IHashingService> _hashing = new();
+        private readonly Mock<IDateTimeProvider> _mockDateTime = new();
         private readonly Mock<IBackgroundJobDispatcher> _bg = new();
         private readonly Mock<ILogger<UserService>> _logger = new();
 
         public UserServiceEmailTests()
         {
+            _mockDateTime.Setup(d => d.UtcNow).Returns(DateTime.UtcNow);
             _hashing.Setup(h => h.GenerateSecureToken(It.IsAny<int>())).Returns((int len) => {
                 var bytes = new byte[Math.Max(1, len)];
                 System.Security.Cryptography.RandomNumberGenerator.Fill(bytes);
@@ -122,7 +124,7 @@ namespace PutZige.Application.Tests.Services
             var pwd = "Password1!";
 
             var mockLogger = new Mock<ILogger<UserService>>();
-            var svc = new UserService(_userRepo.Object, _uow.Object, _mapper.Object, _hashing.Object, _bg.Object, mockLogger.Object);
+            var svc = new UserService(_userRepo.Object, _uow.Object, _mapper.Object, _hashing.Object, _mockDateTime.Object, _bg.Object, mockLogger.Object);
 
             _userRepo.Setup(r => r.IsEmailTakenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
             _userRepo.Setup(r => r.IsUsernameTakenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
@@ -144,7 +146,7 @@ namespace PutZige.Application.Tests.Services
 
         private UserService CreateSvc()
         {
-            return new UserService(_userRepo.Object, _uow.Object, _mapper.Object, _hashing.Object, _bg.Object, _logger.Object);
+            return new UserService(_userRepo.Object, _uow.Object, _mapper.Object, _hashing.Object, _mockDateTime.Object, _bg.Object, _logger.Object);
         }
 
         [Fact]

@@ -45,12 +45,6 @@ namespace PutZige.Application.Services
             _dateTimeProvider = dateTimeProvider;
         }
 
-        // Backwards-compatible overload for tests/consumers that don't provide IDateTimeProvider yet
-        public UserService(IUserRepository userRepository, IUnitOfWork unitOfWork, IMapper mapper, IHashingService hashingService, PutZige.Application.Interfaces.IBackgroundJobDispatcher? backgroundJobDispatcher = null, ILogger<UserService>? logger = null)
-            : this(userRepository, unitOfWork, mapper, hashingService, new PutZige.Application.Services.SystemDateTimeProvider(), backgroundJobDispatcher, logger)
-        {
-        }
-
         /// <summary>
         /// Registers a new user with validation and hashing and returns a response DTO.
         /// </summary>

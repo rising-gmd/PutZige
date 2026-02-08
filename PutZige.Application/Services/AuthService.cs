@@ -57,18 +57,6 @@ namespace PutZige.Application.Services
             _backgroundJobDispatcher = backgroundJobDispatcher ?? new NoOpBackgroundJobDispatcher();
         }
 
-        // Backwards-compatible overload to avoid breaking existing callers/tests that don't provide IDateTimeProvider.
-        public AuthService(IUserRepository userRepository, IUnitOfWork unitOfWork, IJwtTokenService jwtTokenService, IUserService userService, IMapper mapper, IOptions<JwtSettings> jwtOptions, IClientInfoService clientInfoService, IHashingService hashingService, ILogger<AuthService>? logger = null, IBackgroundJobDispatcher? backgroundJobDispatcher = null)
-            : this(userRepository, unitOfWork, jwtTokenService, userService, mapper, jwtOptions, clientInfoService, hashingService, new SystemDateTimeProvider(), dapperUserRepository: null, logger, backgroundJobDispatcher)
-        {
-        }
-
-        // Backwards-compatible overload that accepts an explicit IDateTimeProvider (keeps older test/usage signatures).
-        public AuthService(IUserRepository userRepository, IUnitOfWork unitOfWork, IJwtTokenService jwtTokenService, IUserService userService, IMapper mapper, IOptions<JwtSettings> jwtOptions, IClientInfoService clientInfoService, IHashingService hashingService, IDateTimeProvider dateTimeProvider, ILogger<AuthService>? logger = null, IBackgroundJobDispatcher? backgroundJobDispatcher = null)
-            : this(userRepository, unitOfWork, jwtTokenService, userService, mapper, jwtOptions, clientInfoService, hashingService, dateTimeProvider, dapperUserRepository: null, logger: logger, backgroundJobDispatcher: backgroundJobDispatcher)
-        {
-        }
-
         public async Task<bool> VerifyEmailAsync(string token, CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(token)) throw new AppException(ResponseCodes.TOKEN_REQUIRED, ErrorMessages.Validation.TokenRequired);
