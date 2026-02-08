@@ -35,6 +35,11 @@ public class UserRepository : Repository<User>, IUserRepository
         return await _dbSet.AsNoTracking().FirstOrDefaultAsync(u => u.Username == username, ct).ConfigureAwait(false);
     }
 
+    public async Task<User?> GetByEmailForUpdateAsync(string email, CancellationToken ct = default)
+    {
+        return await _dbSet.FirstOrDefaultAsync(u => u.Email == email, ct);
+    }
+
     /// <inheritdoc/>
     public async Task<bool> IsEmailTakenAsync(string email, CancellationToken ct = default)
     {

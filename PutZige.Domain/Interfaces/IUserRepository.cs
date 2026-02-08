@@ -54,5 +54,10 @@ namespace PutZige.Domain.Interfaces
         /// Atomically verifies an email by token. Returns number of rows affected.
         /// </summary>
         Task<int> VerifyEmailByTokenAsync(string token, CancellationToken ct = default);
+
+        /// <summary>
+        /// Gets a user by email with tracking enabled for updates.
+        /// </summary>
+        Task<User?> GetByEmailForUpdateAsync(string email, CancellationToken ct = default);
     }
 }

@@ -115,7 +115,7 @@ namespace PutZige.Application.Services
             if (string.IsNullOrWhiteSpace(email))
                 throw new AppException(ResponseCodes.EMAIL_REQUIRED, ErrorMessages.Validation.EmailRequired);
 
-            var user = await _userRepository.GetByEmailAsync(email, ct);
+            var user = await _userRepository.GetByEmailForUpdateAsync(email, ct);
 
             if (user == null)
                 throw new KeyNotFoundException(ErrorMessages.General.ResourceNotFound);
