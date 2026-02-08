@@ -28,6 +28,7 @@ namespace PutZige.Application.Tests.Services
         private readonly Mock<IHashingService> _mockHashingService = new();
         private readonly Mock<IBackgroundJobDispatcher> _backgroundDispatcher = new();
         private readonly Mock<IDateTimeProvider> _mockDateTime = new();
+        private readonly Mock<PutZige.Domain.Interfaces.IDapperUserRepository> _dapperUserRepo = new();
         private readonly JwtSettings _jwtSettings = new() { Secret = "TestSecretKeyThatIsLongEnough-1234567890", Issuer = "PutZige", Audience = "PutZige.Users", AccessTokenExpiryMinutes = 15, RefreshTokenExpiryDays = 7 };
 
         public AuthServiceEmailVerificationTests()
@@ -42,7 +43,7 @@ namespace PutZige.Application.Tests.Services
 
         private AuthService CreateService()
         {
-            return new AuthService(_userRepo.Object, _uow.Object, new TestJwtTokenService(), _userService.Object, new AutoMapper.MapperConfiguration(cfg => { }).CreateMapper(), Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _logger.Object, _backgroundDispatcher.Object);
+            return new AuthService(_userRepo.Object, _uow.Object, new TestJwtTokenService(), _userService.Object, new AutoMapper.MapperConfiguration(cfg => { }).CreateMapper(), Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
         }
 
         private User CreateUnverifiedUser(string email, string token, DateTime? expiry = null)
@@ -78,7 +79,7 @@ namespace PutZige.Application.Tests.Services
             var user = CreateUnverifiedUser(email, token);
 
             _userRepo.Setup(r => r.GetByVerificationTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(user);
-            _userRepo.Setup(r => r.VerifyEmailByTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(1);
+            _dapperUserRepo.Setup(d => d.VerifyEmailByTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
             var svc = CreateService();
 
@@ -99,7 +100,7 @@ namespace PutZige.Application.Tests.Services
             var user = CreateUnverifiedUser(email, token);
 
             _userRepo.Setup(r => r.GetByVerificationTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(user);
-            _userRepo.Setup(r => r.VerifyEmailByTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(1);
+            _dapperUserRepo.Setup(d => d.VerifyEmailByTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
             var svc = CreateService();
 
@@ -226,7 +227,7 @@ namespace PutZige.Application.Tests.Services
             _userRepo.SetupSequence(r => r.GetByVerificationTokenAsync(token, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(user)
                 .ReturnsAsync(user);
-            _userRepo.SetupSequence(r => r.VerifyEmailByTokenAsync(token, It.IsAny<CancellationToken>()))
+            _dapperUserRepo.SetupSequence(r => r.VerifyEmailByTokenAsync(token, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(1)
                 .ReturnsAsync(0);
 
@@ -249,7 +250,6 @@ namespace PutZige.Application.Tests.Services
             // Arrange
             var email = "testresend_sendfail@example.com";
             var user = CreateUnverifiedUser(email, "tokfail");
-
             _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
             _backgroundDispatcher.Setup(d => d.EnqueueVerificationEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>())).Throws(new Exception("bg fail"));
 
@@ -266,16 +266,16 @@ namespace PutZige.Application.Tests.Services
         public async Task VerifyEmailAsync_UserNotFound_ThrowsKeyNotFoundException()
         {
             // Arrange
-            var email = "nonexistent_user@example.com";
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync((User?)null);
+            var token = "nonexistent-token";
+            _userRepo.Setup(r => r.GetByVerificationTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync((User?)null);
 
             var svc = CreateService();
 
             // Act
-            Func<Task> act = async () => await svc.VerifyEmailAsync("token");
+            Func<Task> act = async () => await svc.VerifyEmailAsync(token);
 
-            // Assert
-            await act.Should().ThrowAsync<KeyNotFoundException>().WithMessage(ErrorMessages.General.ResourceNotFound + "*");
+            // Assert - token that doesn't map to a user is considered invalid
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.TokenInvalid + "*");
         }
 
         [Fact]
@@ -287,12 +287,20 @@ namespace PutZige.Application.Tests.Services
             var user = CreateUnverifiedUser(email, token);
 
             // Simulate repository returning the same instance for concurrency
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
-            _uow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).Callback(() =>
-            {
-                // Simulate that only one caller will set the user verified and subsequent calls will see IsEmailVerified true
-                user.IsEmailVerified = true;
-            }).ReturnsAsync(1);
+            _userRepo.Setup(r => r.GetByVerificationTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            // Dapper atomic update: first call succeeds (1) and sets the user's verified flag, second call returns 0
+            int callCount = 0;
+            _dapperUserRepo.Setup(d => d.VerifyEmailByTokenAsync(token, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(() =>
+                {
+                    var c = System.Threading.Interlocked.Increment(ref callCount);
+                    if (c == 1)
+                    {
+                        user.IsEmailVerified = true;
+                        return 1;
+                    }
+                    return 0;
+                });
 
             var svc = CreateService();
 
@@ -327,7 +335,7 @@ namespace PutZige.Application.Tests.Services
             results.Should().Contain(true);
             results.Should().Contain(false);
             user.IsEmailVerified.Should().BeTrue();
-            _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+            _dapperUserRepo.Verify(d => d.VerifyEmailByTokenAsync(token, It.IsAny<CancellationToken>()), Times.Exactly(2));
         }
 
         [Fact]
@@ -379,7 +387,7 @@ namespace PutZige.Application.Tests.Services
             user.IsEmailVerified = true;
 
             _userRepo.Setup(r => r.GetByVerificationTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(user);
-            _userRepo.Setup(r => r.VerifyEmailByTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(1);
+            _dapperUserRepo.Setup(d => d.VerifyEmailByTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
             var svc = CreateService();
 
@@ -525,7 +533,8 @@ namespace PutZige.Application.Tests.Services
             var token = "savetok";
             var user = CreateUnverifiedUser(email, token);
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByVerificationTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _dapperUserRepo.Setup(d => d.VerifyEmailByTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
             var svc = CreateService();
 
@@ -534,7 +543,6 @@ namespace PutZige.Application.Tests.Services
 
             // Assert
             result.Should().BeTrue();
-            _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]
@@ -545,7 +553,8 @@ namespace PutZige.Application.Tests.Services
             var token = "logtoken";
             var user = CreateUnverifiedUser(email, token);
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByVerificationTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _dapperUserRepo.Setup(d => d.VerifyEmailByTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
             var svc = CreateService();
 

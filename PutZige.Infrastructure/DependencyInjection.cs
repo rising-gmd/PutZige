@@ -18,6 +18,8 @@ using PutZige.Infrastructure.Services;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PutZige.Application.Settings;
 using PutZige.Application.Validators;
+using PutZige.Infrastructure.Data.Dapper;
+using PutZige.Infrastructure.Repositories.Dapper;
 
 namespace PutZige.Infrastructure;
 
@@ -93,6 +95,10 @@ public static class DependencyInjection
 
         // Connection mapping service used by SignalR hubs to avoid static state
         services.AddSingleton<IConnectionMappingService, ConnectionMappingService>();
+
+        // Dapper context and repositories
+        services.AddScoped<DapperContext>();
+        services.AddScoped<IDapperUserRepository, DapperUserRepository>();
 
         // Register Hangfire background service types
         services.AddScoped<EmailBackgroundService>();

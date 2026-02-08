@@ -29,8 +29,9 @@ namespace PutZige.Application.Services
         private readonly IHashingService _hashingService;
         private readonly IBackgroundJobDispatcher _backgroundJobDispatcher;
         private readonly IDateTimeProvider _dateTimeProvider;
+        private readonly IDapperUserRepository? _dapperUserRepository;
 
-        public AuthService(IUserRepository userRepository, IUnitOfWork unitOfWork, IJwtTokenService jwtTokenService, IUserService userService, IMapper mapper, IOptions<JwtSettings> jwtOptions, IClientInfoService clientInfoService, IHashingService hashingService, IDateTimeProvider dateTimeProvider, ILogger<AuthService>? logger = null, IBackgroundJobDispatcher? backgroundJobDispatcher = null)
+        public AuthService(IUserRepository userRepository, IUnitOfWork unitOfWork, IJwtTokenService jwtTokenService, IUserService userService, IMapper mapper, IOptions<JwtSettings> jwtOptions, IClientInfoService clientInfoService, IHashingService hashingService, IDateTimeProvider dateTimeProvider, IDapperUserRepository? dapperUserRepository = null, ILogger<AuthService>? logger = null, IBackgroundJobDispatcher? backgroundJobDispatcher = null)
         {
             ArgumentNullException.ThrowIfNull(userRepository);
             ArgumentNullException.ThrowIfNull(unitOfWork);
@@ -52,13 +53,19 @@ namespace PutZige.Application.Services
             _clientInfoService = clientInfoService;
             _hashingService = hashingService;
             _dateTimeProvider = dateTimeProvider;
-            // Ensure a background job dispatcher is always available to avoid null refs when enqueueing jobs
+            _dapperUserRepository = dapperUserRepository;
             _backgroundJobDispatcher = backgroundJobDispatcher ?? new NoOpBackgroundJobDispatcher();
         }
 
         // Backwards-compatible overload to avoid breaking existing callers/tests that don't provide IDateTimeProvider.
         public AuthService(IUserRepository userRepository, IUnitOfWork unitOfWork, IJwtTokenService jwtTokenService, IUserService userService, IMapper mapper, IOptions<JwtSettings> jwtOptions, IClientInfoService clientInfoService, IHashingService hashingService, ILogger<AuthService>? logger = null, IBackgroundJobDispatcher? backgroundJobDispatcher = null)
-            : this(userRepository, unitOfWork, jwtTokenService, userService, mapper, jwtOptions, clientInfoService, hashingService, new SystemDateTimeProvider(), logger, backgroundJobDispatcher)
+            : this(userRepository, unitOfWork, jwtTokenService, userService, mapper, jwtOptions, clientInfoService, hashingService, new SystemDateTimeProvider(), dapperUserRepository: null, logger, backgroundJobDispatcher)
+        {
+        }
+
+        // Backwards-compatible overload that accepts an explicit IDateTimeProvider (keeps older test/usage signatures).
+        public AuthService(IUserRepository userRepository, IUnitOfWork unitOfWork, IJwtTokenService jwtTokenService, IUserService userService, IMapper mapper, IOptions<JwtSettings> jwtOptions, IClientInfoService clientInfoService, IHashingService hashingService, IDateTimeProvider dateTimeProvider, ILogger<AuthService>? logger = null, IBackgroundJobDispatcher? backgroundJobDispatcher = null)
+            : this(userRepository, unitOfWork, jwtTokenService, userService, mapper, jwtOptions, clientInfoService, hashingService, dateTimeProvider, dapperUserRepository: null, logger: logger, backgroundJobDispatcher: backgroundJobDispatcher)
         {
         }
 
@@ -80,9 +87,8 @@ namespace PutZige.Application.Services
             if (!user.EmailVerificationTokenExpiry.HasValue || user.EmailVerificationTokenExpiry.Value <= _dateTimeProvider.UtcNow)
                 throw new AppException(ResponseCodes.TOKEN_EXPIRED, ErrorMessages.Email.TokenExpired);
 
-            // Perform an atomic update to avoid race conditions where multiple requests try to verify the same token.
-            var rows = await _userRepository.VerifyEmailByTokenAsync(token, ct);
-
+            // Perform an atomic update using the Dapper repository when available to avoid race conditions where multiple requests try to verify the same token.
+            int rows =  await _dapperUserRepository.VerifyEmailByTokenAsync(token, ct).ConfigureAwait(false);
             if (rows == 0)
             {
                 // No rows updated - likely already verified by a concurrent request
