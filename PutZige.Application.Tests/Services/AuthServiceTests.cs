@@ -98,7 +98,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.LoginAsync(username, "any", CancellationToken.None);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.InvalidCredentials + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.InvalidCredentials + "*");
         }
 
         /// <summary>
@@ -172,14 +172,14 @@ namespace PutZige.Application.Tests.Services
             for (int i = 1; i <= 4; i++)
             {
                 Func<Task> act = async () => await svc.LoginAsync(email, wrong, CancellationToken.None);
-                await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.InvalidCredentials + "*");
+                await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.InvalidCredentials + "*");
                 user.FailedLoginAttempts.Should().Be(i);
                 user.IsLocked.Should().BeFalse();
             }
 
             // 5th attempt locks
             Func<Task> act5 = async () => await svc.LoginAsync(email, wrong, CancellationToken.None);
-            await act5.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.InvalidCredentials + "*");
+            await act5.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.InvalidCredentials + "*");
             user.FailedLoginAttempts.Should().Be(5);
             user.IsLocked.Should().BeTrue();
             user.LockedUntil.Should().BeAfter(DateTime.UtcNow);
@@ -215,7 +215,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.LoginAsync(email, password, CancellationToken.None);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.AccountLocked + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.AccountLocked + "*");
         }
 
         /// <summary>
@@ -234,7 +234,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.LoginAsync(email, "any", CancellationToken.None);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.InvalidCredentials + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.InvalidCredentials + "*");
         }
 
         /// <summary>
@@ -251,7 +251,7 @@ namespace PutZige.Application.Tests.Services
             var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _logger.Object);
 
             Func<Task> act = async () => await svc.LoginAsync(email, "P1!", CancellationToken.None);
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.AccountInactive + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.AccountInactive + "*");
         }
 
         /// <summary>
@@ -268,7 +268,7 @@ namespace PutZige.Application.Tests.Services
             var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _logger.Object);
 
             Func<Task> act = async () => await svc.LoginAsync(email, "P1!", CancellationToken.None);
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.EmailNotVerified + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.EmailNotVerified + "*");
         }
 
         /// <summary>
@@ -339,7 +339,7 @@ namespace PutZige.Application.Tests.Services
             // Act
             Func<Task> act = async () => await svc.RefreshTokenAsync("old-refresh", CancellationToken.None);
 
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.InvalidRefreshToken + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.InvalidRefreshToken + "*");
         }
 
         /// <summary>
@@ -354,7 +354,7 @@ namespace PutZige.Application.Tests.Services
             var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _logger.Object);
 
             Func<Task> act = async () => await svc.RefreshTokenAsync("bad-token", CancellationToken.None);
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.InvalidRefreshToken + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.InvalidRefreshToken + "*");
         }
 
         /// <summary>
@@ -461,7 +461,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.LoginAsync(email, password, CancellationToken.None);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.AccountLocked + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.AccountLocked + "*");
         }
 
         /// <summary>
@@ -607,7 +607,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.RefreshTokenAsync(token, CancellationToken.None);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.InvalidRefreshToken + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.InvalidRefreshToken + "*");
         }
 
         /// <summary>
@@ -633,7 +633,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.RefreshTokenAsync(token, CancellationToken.None);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.InvalidRefreshToken + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.InvalidRefreshToken + "*");
         }
 
         /// <summary>

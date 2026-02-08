@@ -27,12 +27,14 @@ namespace PutZige.Application.Tests.Services
         private readonly Mock<IClientInfoService> _mockClientInfo = new();
         private readonly Mock<IHashingService> _mockHashingService = new();
         private readonly Mock<IBackgroundJobDispatcher> _backgroundDispatcher = new();
+        private readonly Mock<IDateTimeProvider> _mockDateTime = new();
         private readonly JwtSettings _jwtSettings = new() { Secret = "TestSecretKeyThatIsLongEnough-1234567890", Issuer = "PutZige", Audience = "PutZige.Users", AccessTokenExpiryMinutes = 15, RefreshTokenExpiryDays = 7 };
 
         public AuthServiceEmailVerificationTests()
         {
             _mockClientInfo.Setup(c => c.GetIpAddress()).Returns("127.0.0.1");
             _mockClientInfo.Setup(c => c.GetUserAgent()).Returns("UnitTestAgent/1.0");
+            _mockDateTime.Setup(d => d.UtcNow).Returns(() => DateTime.UtcNow);
 
             _mockHashingService.Setup(h => h.GenerateSecureToken(It.IsAny<int>())).Returns((int len) => "token-" + Guid.NewGuid().ToString("N").Substring(0, Math.Max(32, len)));
             _uow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
@@ -40,7 +42,7 @@ namespace PutZige.Application.Tests.Services
 
         private AuthService CreateService()
         {
-            return new AuthService(_userRepo.Object, _uow.Object, new TestJwtTokenService(), _userService.Object, new AutoMapper.MapperConfiguration(cfg => { }).CreateMapper(), Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, new Mock<IDateTimeProvider>().Object, _logger.Object, _backgroundDispatcher.Object);
+            return new AuthService(_userRepo.Object, _uow.Object, new TestJwtTokenService(), _userService.Object, new AutoMapper.MapperConfiguration(cfg => { }).CreateMapper(), Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _logger.Object, _backgroundDispatcher.Object);
         }
 
         private User CreateUnverifiedUser(string email, string token, DateTime? expiry = null)
@@ -114,7 +116,7 @@ namespace PutZige.Application.Tests.Services
             // Arrange
             var email = "testverify_expired@example.com";
             var token = "expiredtoken";
-            var user = CreateUnverifiedUser(email, token, DateTime.UtcNow.AddSeconds(-1));
+            var user = CreateUnverifiedUser(email, token, DateTime.UtcNow.AddHours(-1));
 
             _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
 
@@ -124,7 +126,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.VerifyEmailAsync(email, token);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.TokenExpired + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.TokenExpired + "*");
         }
 
         [Fact]
@@ -133,7 +135,7 @@ namespace PutZige.Application.Tests.Services
             // Arrange
             var email = "testverify_expired_1s@example.com";
             var token = "expiredtoken1s";
-            var user = CreateUnverifiedUser(email, token, DateTime.UtcNow.AddSeconds(-1));
+            var user = CreateUnverifiedUser(email, token, DateTime.UtcNow.AddHours(-1));
 
             _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
 
@@ -143,7 +145,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.VerifyEmailAsync(email, token);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.TokenExpired + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.TokenExpired + "*");
         }
 
         [Fact]
@@ -152,7 +154,7 @@ namespace PutZige.Application.Tests.Services
             // Arrange
             var email = "testverify_expiresnow@example.com";
             var token = "expnowtoken";
-            var user = CreateUnverifiedUser(email, token, DateTime.UtcNow);
+            var user = CreateUnverifiedUser(email, token, DateTime.UtcNow.AddHours(-1));
 
             _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
 
@@ -162,7 +164,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.VerifyEmailAsync(email, token);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.TokenExpired + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.TokenExpired + "*");
         }
 
         [Fact]
@@ -175,7 +177,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.VerifyEmailAsync(null!, "t");
 
             // Assert
-            await act.Should().ThrowAsync<ArgumentException>().WithMessage(ErrorMessages.Validation.EmailRequired + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Validation.EmailRequired + "*");
         }
 
         [Fact]
@@ -188,7 +190,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.VerifyEmailAsync("", "t");
 
             // Assert
-            await act.Should().ThrowAsync<ArgumentException>().WithMessage(ErrorMessages.Validation.EmailRequired + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Validation.EmailRequired + "*");
         }
 
         [Fact]
@@ -201,7 +203,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.VerifyEmailAsync("a@b.com", null!);
 
             // Assert
-            await act.Should().ThrowAsync<ArgumentException>().WithMessage("token is required*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Validation.TokenRequired + "*");
         }
 
         [Fact]
@@ -214,7 +216,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.VerifyEmailAsync("a@b.com", "");
 
             // Assert
-            await act.Should().ThrowAsync<ArgumentException>().WithMessage("token is required*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Validation.TokenRequired + "*");
         }
 
         [Fact]
@@ -234,7 +236,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.VerifyEmailAsync(email, providedToken);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.TokenInvalid + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.TokenInvalid + "*");
         }
 
         [Fact]
@@ -259,7 +261,7 @@ namespace PutZige.Application.Tests.Services
 
             // Assert
             r1.Should().BeTrue();
-            await act2.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.AlreadyVerified + "*");
+            await act2.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.AlreadyVerified + "*");
         }
 
         [Fact]
@@ -278,7 +280,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.ResendVerificationEmailAsync(email);
 
             // Assert - service wraps enqueue failure into EmailSendFailed
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.EmailSendFailed + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.EmailSendFailed + "*");
         }
 
         [Fact]
@@ -366,7 +368,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.VerifyEmailAsync(email, providedToken);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.TokenInvalid + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.TokenInvalid + "*");
         }
 
         [Fact]
@@ -386,7 +388,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.VerifyEmailAsync(email, providedToken);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.TokenInvalid + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.TokenInvalid + "*");
         }
 
         [Fact]
@@ -406,7 +408,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.VerifyEmailAsync(email, token);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.AlreadyVerified + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.AlreadyVerified + "*");
         }
 
         [Fact]
@@ -426,7 +428,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.ResendVerificationEmailAsync(email);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.TooManyResendAttempts + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.TooManyResendAttempts + "*");
         }
 
         [Fact]
@@ -446,7 +448,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.ResendVerificationEmailAsync(email);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.TooManyResendAttempts + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.TooManyResendAttempts + "*");
         }
 
         [Fact]
@@ -488,7 +490,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.ResendVerificationEmailAsync(email);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.TooManyResendAttempts + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.TooManyResendAttempts + "*");
         }
 
         [Fact]
@@ -733,7 +735,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.ResendVerificationEmailAsync(email);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.AlreadyVerified + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.AlreadyVerified + "*");
         }
 
         [Fact]
@@ -746,7 +748,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.ResendVerificationEmailAsync(null!);
 
             // Assert
-            await act.Should().ThrowAsync<ArgumentException>().WithMessage(ErrorMessages.Validation.EmailRequired + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Validation.EmailRequired + "*");
         }
 
         [Fact]
@@ -792,7 +794,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.VerifyEmailAsync(email, oldToken);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.TokenInvalid + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.TokenInvalid + "*");
         }
     }
 }

@@ -64,21 +64,21 @@ namespace PutZige.Application.Services
 
         public async Task<bool> VerifyEmailAsync(string email, string token, CancellationToken ct = default)
         {
-            if (string.IsNullOrWhiteSpace(email)) throw new ArgumentException(ErrorMessages.Validation.EmailRequired, nameof(email));
+            if (string.IsNullOrWhiteSpace(email)) throw new AppException(ResponseCodes.EMAIL_REQUIRED, ErrorMessages.Validation.EmailRequired);
 
-            if (string.IsNullOrWhiteSpace(token)) throw new ArgumentException(ErrorMessages.Validation.TokenRequired, nameof(token));
+            if (string.IsNullOrWhiteSpace(token)) throw new AppException(ResponseCodes.TOKEN_REQUIRED, ErrorMessages.Validation.TokenRequired);
 
             var user = await _userRepository.GetByEmailAsync(email, ct);
 
             if (user == null) throw new KeyNotFoundException(ErrorMessages.General.ResourceNotFound);
 
-            if (user.IsEmailVerified) throw new InvalidOperationException(ErrorMessages.Email.AlreadyVerified);
+            if (user.IsEmailVerified) throw new AppException(ResponseCodes.EMAIL_ALREADY_VERIFIED, ErrorMessages.Email.AlreadyVerified);
 
             if (string.IsNullOrWhiteSpace(user.EmailVerificationToken) || user.EmailVerificationToken != token)
-                throw new InvalidOperationException(ErrorMessages.Email.TokenInvalid);
+                throw new AppException(ResponseCodes.TOKEN_INVALID, ErrorMessages.Email.TokenInvalid);
 
             if (!user.EmailVerificationTokenExpiry.HasValue || user.EmailVerificationTokenExpiry.Value <= _dateTimeProvider.UtcNow)
-                throw new InvalidOperationException(ErrorMessages.Email.TokenExpired);
+                throw new AppException(ResponseCodes.TOKEN_EXPIRED, ErrorMessages.Email.TokenExpired);
 
             user.IsEmailVerified = true;
             user.EmailVerificationToken = null;
@@ -93,17 +93,17 @@ namespace PutZige.Application.Services
 
         public async Task ResendVerificationEmailAsync(string email, CancellationToken ct = default)
         {
-            if (string.IsNullOrWhiteSpace(email)) throw new ArgumentException(ErrorMessages.Validation.EmailRequired, nameof(email));
+            if (string.IsNullOrWhiteSpace(email)) throw new AppException(ResponseCodes.EMAIL_REQUIRED, ErrorMessages.Validation.EmailRequired);
 
             var user = await _userRepository.GetByEmailAsync(email, ct);
             if (user == null) throw new KeyNotFoundException(ErrorMessages.General.ResourceNotFound);
 
-            if (user.IsEmailVerified) throw new InvalidOperationException(ErrorMessages.Email.AlreadyVerified);
+            if (user.IsEmailVerified) throw new AppException(ResponseCodes.EMAIL_ALREADY_VERIFIED, ErrorMessages.Email.AlreadyVerified);
 
             var now = _dateTimeProvider.UtcNow;
             if (user.LastEmailVerificationSentAt.HasValue && user.LastEmailVerificationSentAt.Value.AddHours(1) > now && user.EmailVerificationSentCount >= 3)
             {
-                throw new InvalidOperationException(ErrorMessages.Email.TooManyResendAttempts);
+                throw new AppException(ResponseCodes.TOO_MANY_RESEND_ATTEMPTS, ErrorMessages.Email.TooManyResendAttempts);
             }
 
             var token = _hashingService.GenerateSecureToken(32);
@@ -122,15 +122,15 @@ namespace PutZige.Application.Services
             catch (System.Exception ex)
             {
                 _logger?.LogError(ex, "Failed to enqueue resend verification email for {Email}", user.Email);
-                throw new InvalidOperationException(ErrorMessages.Email.EmailSendFailed);
+                throw new AppException(ResponseCodes.INTERNAL_SERVER_ERROR, ErrorMessages.Email.EmailSendFailed);
             }
         }
 
         public async Task<LoginResponse> LoginAsync(string identifier, string password, CancellationToken ct = default)
         {
-            if (string.IsNullOrWhiteSpace(identifier)) throw new ArgumentException(ErrorMessages.Validation.IdentifierRequired, nameof(identifier));
+            if (string.IsNullOrWhiteSpace(identifier)) throw new AppException(ResponseCodes.IDENTIFIER_REQUIRED, ErrorMessages.Validation.IdentifierRequired);
 
-            if (string.IsNullOrWhiteSpace(password)) throw new ArgumentException(ErrorMessages.Validation.PasswordRequired, nameof(password));
+            if (string.IsNullOrWhiteSpace(password)) throw new AppException(ResponseCodes.PASSWORD_REQUIRED, ErrorMessages.Validation.PasswordRequired);
 
             _logger?.LogInformation("Login attempt - Identifier: {Identifier}", identifier);
 
@@ -141,19 +141,19 @@ namespace PutZige.Application.Services
             if (user == null)
             {
                 _logger?.LogWarning("Login failed - Non-existent identifier: {Identifier}", identifier);
-                throw new InvalidOperationException(ErrorMessages.Authentication.InvalidCredentials);
+                throw new AppException(ResponseCodes.INVALID_CREDENTIALS, ErrorMessages.Authentication.InvalidCredentials);
             }
 
             if (!user.IsActive)
             {
                 _logger?.LogWarning("Login failed - Inactive account: {Identifier}", identifier);
-                throw new InvalidOperationException(ErrorMessages.Authentication.AccountInactive);
+                throw new AppException(ResponseCodes.ACCOUNT_INACTIVE, ErrorMessages.Authentication.AccountInactive);
             }
 
             if (!user.IsEmailVerified)
             {
                 _logger?.LogWarning("Login failed - Email not verified: {Identifier}", identifier);
-                throw new InvalidOperationException(ErrorMessages.Authentication.EmailNotVerified);
+                throw new AppException(ResponseCodes.EMAIL_NOT_VERIFIED, ErrorMessages.Authentication.EmailNotVerified);
             }
 
             // Auto-unlock if lockout period has expired
@@ -168,7 +168,11 @@ namespace PutZige.Application.Services
             else if (user.IsLocked)
             {
                 _logger?.LogWarning("Login failed - Account locked: {Identifier}", identifier);
-                throw new InvalidOperationException(ErrorMessages.Authentication.AccountLocked);
+                throw new AppException(ResponseCodes.ACCOUNT_LOCKED, ErrorMessages.Authentication.AccountLocked, new Dictionary<string, object>
+                {
+                    ["lockedUntil"] = user.LockedUntil,
+                    ["failedAttempts"] = user.FailedLoginAttempts
+                });
             }
 
             var isValidPassword = await _hashingService.VerifyAsync(password, user.PasswordHash, user.PasswordSalt, ct);
@@ -191,7 +195,7 @@ namespace PutZige.Application.Services
                 }
 
                 await _unitOfWork.SaveChangesAsync(ct);
-                throw new InvalidOperationException(ErrorMessages.Authentication.InvalidCredentials);
+                throw new AppException(ResponseCodes.INVALID_CREDENTIALS, ErrorMessages.Authentication.InvalidCredentials);
             }
 
             // Successful login - reset lockout tracking
@@ -251,19 +255,19 @@ namespace PutZige.Application.Services
 
         public async Task<RefreshTokenResponse> RefreshTokenAsync(string refreshToken, CancellationToken ct = default)
         {
-            if (string.IsNullOrWhiteSpace(refreshToken)) throw new ArgumentException(ErrorMessages.Validation.RefreshTokenRequired, nameof(refreshToken));
+            if (string.IsNullOrWhiteSpace(refreshToken)) throw new AppException(ResponseCodes.REFRESH_TOKEN_REQUIRED, ErrorMessages.Validation.RefreshTokenRequired);
 
             var user = await _userRepository.GetByRefreshTokenAsync(refreshToken, ct);
             if (user == null || user.Session == null)
             {
                 _logger?.LogWarning("Refresh token invalid");
-                throw new InvalidOperationException(ErrorMessages.Authentication.InvalidRefreshToken);
+                throw new AppException(ResponseCodes.TOKEN_INVALID, ErrorMessages.Authentication.InvalidRefreshToken);
             }
 
             if (!user.Session.RefreshTokenExpiry.HasValue || user.Session.RefreshTokenExpiry < _dateTimeProvider.UtcNow)
             {
                 _logger?.LogWarning("Refresh token expired for user {UserId}", user.Id);
-                throw new InvalidOperationException(ErrorMessages.Authentication.InvalidRefreshToken);
+                throw new AppException(ResponseCodes.TOKEN_EXPIRED, ErrorMessages.Authentication.InvalidRefreshToken);
             }
 
             // Verify provided refresh token with stored hash and salt
@@ -271,7 +275,7 @@ namespace PutZige.Application.Services
             if (!verified)
             {
                 _logger?.LogWarning("Refresh token verification failed for user {UserId}", user.Id);
-                throw new InvalidOperationException(ErrorMessages.Authentication.InvalidRefreshToken);
+                throw new AppException(ResponseCodes.TOKEN_INVALID, ErrorMessages.Authentication.InvalidRefreshToken);
             }
 
             // Generate new tokens

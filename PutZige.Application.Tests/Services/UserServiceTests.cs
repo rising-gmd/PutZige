@@ -292,7 +292,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await _sut.RegisterUserAsync(email, username, password, _ct);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.EmailAlreadyTaken);
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.EmailAlreadyTaken);
 
             _mockUserRepository.Verify(x => x.IsEmailTakenAsync(email, It.IsAny<CancellationToken>()), Times.Once);
             _mockUserRepository.Verify(x => x.IsUsernameTakenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -318,7 +318,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await _sut.RegisterUserAsync(email, username, password, _ct);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.UsernameAlreadyTaken);
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.UsernameAlreadyTaken);
 
             _mockUserRepository.Verify(x => x.IsEmailTakenAsync(email, It.IsAny<CancellationToken>()), Times.Once);
             _mockUserRepository.Verify(x => x.IsUsernameTakenAsync(username, It.IsAny<CancellationToken>()), Times.Once);
@@ -341,7 +341,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await _sut.RegisterUserAsync(email!, username, password, _ct);
 
             // Assert
-            await act.Should().ThrowAsync<ArgumentException>().WithMessage(ErrorMessages.Validation.EmailRequired + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Validation.EmailRequired + "*");
 
             _mockUserRepository.Verify(x => x.IsEmailTakenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         }
@@ -362,7 +362,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await _sut.RegisterUserAsync(email, username, password, _ct);
 
             // Assert
-            await act.Should().ThrowAsync<ArgumentException>().WithMessage(ErrorMessages.Validation.UsernameRequired + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Validation.UsernameRequired + "*");
 
             _mockUserRepository.Verify(x => x.IsUsernameTakenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         }
@@ -382,7 +382,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await _sut.RegisterUserAsync(email, username, password!, _ct);
 
             // Assert
-            await act.Should().ThrowAsync<ArgumentException>().WithMessage(ErrorMessages.Validation.PasswordRequired + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Validation.PasswordRequired + "*");
 
             _mockUserRepository.Verify(x => x.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Never);
             _mockUnitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);

@@ -15,6 +15,7 @@ using FluentValidation;
 using FluentValidation.Results;
 using System.Threading.Tasks;
 using PutZige.Application.Common.Messages;
+using PutZige.Application.Common.Constants;
 
 namespace PutZige.API.Extensions
 {
@@ -217,7 +218,7 @@ namespace PutZige.API.Extensions
 
                         var retryAfter = window;
 
-                        var apiPayload = ApiResponse<object>.Error(ErrorMessages.RateLimit.Exceeded, null, StatusCodes.Status429TooManyRequests);
+                        var apiPayload = ApiResponse<object>.Error(ResponseCodes.VALIDATION_FAILED, ErrorMessages.RateLimit.Exceeded, null, StatusCodes.Status429TooManyRequests);
 
                         var response = httpContext?.Response;
                         if (response != null)

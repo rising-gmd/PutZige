@@ -7,6 +7,7 @@ using AutoMapper;
 using Microsoft.Extensions.Logging;
 using PutZige.Application.Common.Messages;
 using PutZige.Application.Common.Constants;
+using PutZige.Application.Common;
 using PutZige.Application.DTOs.Messaging;
 using PutZige.Application.Interfaces;
 using PutZige.Domain.Entities;
@@ -38,13 +39,17 @@ public class MessagingService : IMessagingService
 
     public async Task<SendMessageResponse> SendMessageAsync(Guid senderId, Guid receiverId, string messageText, CancellationToken ct = default)
     {
-        if (senderId == Guid.Empty) throw new ArgumentException(ErrorMessages.Messaging.SenderIdRequired, nameof(senderId));
+        if (senderId == Guid.Empty) throw new AppException(ResponseCodes.SENDER_ID_REQUIRED, ErrorMessages.Messaging.SenderIdRequired);
 
-        if (receiverId == Guid.Empty) throw new ArgumentException(ErrorMessages.Messaging.ReceiverIdRequired, nameof(receiverId));
+        if (receiverId == Guid.Empty) throw new AppException(ResponseCodes.RECEIVER_ID_REQUIRED, ErrorMessages.Messaging.ReceiverIdRequired);
 
-        if (string.IsNullOrWhiteSpace(messageText)) throw new ArgumentException(ErrorMessages.Messaging.MessageTextRequired, nameof(messageText));
+        if (string.IsNullOrWhiteSpace(messageText)) throw new AppException(ResponseCodes.MESSAGE_TEXT_REQUIRED, ErrorMessages.Messaging.MessageTextRequired);
 
-        if (messageText.Length > AppConstants.Messaging.MaxMessageLength) throw new ArgumentException(ErrorMessages.Messaging.MessageTooLong, nameof(messageText));
+        if (messageText.Length > AppConstants.Messaging.MaxMessageLength) throw new AppException(ResponseCodes.MESSAGE_TOO_LONG, ErrorMessages.Messaging.MessageTooLong);
+        if (senderId == Guid.Empty) throw new AppException(ResponseCodes.SENDER_ID_REQUIRED, ErrorMessages.Messaging.SenderIdRequired);
+        if (receiverId == Guid.Empty) throw new AppException(ResponseCodes.RECEIVER_ID_REQUIRED, ErrorMessages.Messaging.ReceiverIdRequired);
+        if (string.IsNullOrWhiteSpace(messageText)) throw new AppException(ResponseCodes.MESSAGE_TEXT_REQUIRED, ErrorMessages.Messaging.MessageTextRequired);
+        if (messageText.Length > AppConstants.Messaging.MaxMessageLength) throw new AppException(ResponseCodes.MESSAGE_TOO_LONG, ErrorMessages.Messaging.MessageTooLong);
 
         // Validate sender exists
         var sender = await _userRepository.GetByIdAsync(senderId, ct);
@@ -75,10 +80,12 @@ public class MessagingService : IMessagingService
 
     public async Task<ConversationHistoryResponse> GetConversationHistoryAsync(Guid userId, Guid otherUserId, int pageNumber, int pageSize, CancellationToken ct = default)
     {
-        if (userId == Guid.Empty) throw new ArgumentException(ErrorMessages.Messaging.SenderIdRequired, nameof(userId));
-        if (otherUserId == Guid.Empty) throw new ArgumentException(ErrorMessages.Messaging.ReceiverIdRequired, nameof(otherUserId));
+        if (userId == Guid.Empty) throw new AppException(ResponseCodes.SENDER_ID_REQUIRED, ErrorMessages.Messaging.SenderIdRequired);
+        if (otherUserId == Guid.Empty) throw new AppException(ResponseCodes.RECEIVER_ID_REQUIRED, ErrorMessages.Messaging.ReceiverIdRequired);
         if (pageNumber <= 0) throw new ArgumentOutOfRangeException(nameof(pageNumber), ErrorMessages.Messaging.PageNumberOutOfRange);
         if (pageSize <= 0 || pageSize > AppConstants.Messaging.MaxPageSize) throw new ArgumentOutOfRangeException(nameof(pageSize), ErrorMessages.Messaging.PageSizeOutOfRange);
+        if (userId == Guid.Empty) throw new AppException(ResponseCodes.SENDER_ID_REQUIRED, ErrorMessages.Messaging.SenderIdRequired);
+        if (otherUserId == Guid.Empty) throw new AppException(ResponseCodes.RECEIVER_ID_REQUIRED, ErrorMessages.Messaging.ReceiverIdRequired);
 
         var (messages, totalCount) = await _messageRepository.GetConversationAsync(userId, otherUserId, pageNumber, pageSize, ct);
 
@@ -95,7 +102,7 @@ public class MessagingService : IMessagingService
 
     public async Task MarkMessageAsDeliveredAsync(Guid messageId, CancellationToken ct = default)
     {
-        if (messageId == Guid.Empty) throw new ArgumentException(ErrorMessages.Messaging.MessageNotFound, nameof(messageId));
+        if (messageId == Guid.Empty) throw new AppException(ResponseCodes.MESSAGE_NOT_FOUND, ErrorMessages.Messaging.MessageNotFound);
 
         var message = await _messageRepository.GetByIdAsync(messageId, ct);
         if (message == null) throw new KeyNotFoundException(ErrorMessages.Messaging.MessageNotFound);
@@ -109,7 +116,7 @@ public class MessagingService : IMessagingService
 
     public async Task MarkMessageAsReadAsync(Guid messageId, CancellationToken ct = default)
     {
-        if (messageId == Guid.Empty) throw new ArgumentException(ErrorMessages.Messaging.MessageNotFound, nameof(messageId));
+        if (messageId == Guid.Empty) throw new AppException(ResponseCodes.MESSAGE_NOT_FOUND, ErrorMessages.Messaging.MessageNotFound);
 
         var message = await _messageRepository.GetByIdAsync(messageId, ct);
         if (message == null) throw new KeyNotFoundException(ErrorMessages.Messaging.MessageNotFound);

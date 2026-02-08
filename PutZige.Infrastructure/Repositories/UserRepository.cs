@@ -1,6 +1,8 @@
 #nullable enable
 using Microsoft.EntityFrameworkCore;
 using PutZige.Domain.Entities;
+using PutZige.Application.Common;
+using PutZige.Application.Common.Constants;
 using PutZige.Domain.Interfaces;
 using PutZige.Infrastructure.Data;
 using System;
@@ -22,14 +24,14 @@ public class UserRepository : Repository<User>, IUserRepository
     /// <inheritdoc/>
     public async Task<User?> GetByEmailAsync(string email, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(email)) throw new ArgumentException("email is required", nameof(email));
+        if (string.IsNullOrWhiteSpace(email)) throw new AppException(ResponseCodes.EMAIL_REQUIRED, "email is required");
         return await _dbSet.AsNoTracking().FirstOrDefaultAsync(u => u.Email == email, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
     public async Task<User?> GetByUsernameAsync(string username, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(username)) throw new ArgumentException("username is required", nameof(username));
+        if (string.IsNullOrWhiteSpace(username)) throw new AppException(ResponseCodes.USERNAME_REQUIRED, "username is required");
         return await _dbSet.AsNoTracking().FirstOrDefaultAsync(u => u.Username == username, ct).ConfigureAwait(false);
     }
 
@@ -50,14 +52,14 @@ public class UserRepository : Repository<User>, IUserRepository
     /// <inheritdoc/>
     public async Task<User?> GetByEmailWithSessionAsync(string email, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(email)) throw new ArgumentException("email is required", nameof(email));
+        if (string.IsNullOrWhiteSpace(email)) throw new AppException(ResponseCodes.EMAIL_REQUIRED, "email is required");
         return await _dbSet.Include(u => u.Session).FirstOrDefaultAsync(u => u.Email == email, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
     public async Task<User?> GetByUsernameWithSessionAsync(string username, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(username)) throw new ArgumentException("username is required", nameof(username));
+        if (string.IsNullOrWhiteSpace(username)) throw new AppException(ResponseCodes.USERNAME_REQUIRED, "username is required");
         return await _dbSet.Include(u => u.Session).FirstOrDefaultAsync(u => u.Username == username, ct).ConfigureAwait(false);
     }
 
