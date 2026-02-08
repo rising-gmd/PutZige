@@ -11,6 +11,7 @@ using PutZige.Application.Settings;
 using PutZige.Domain.Entities;
 using PutZige.Domain.Interfaces;
 using System;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -57,50 +58,30 @@ namespace PutZige.Application.Services
             _backgroundJobDispatcher = backgroundJobDispatcher ?? new NoOpBackgroundJobDispatcher();
         }
 
-        /// <summary>
-        /// Resends verification email by extracting email from the composite token.
-        /// </summary>
-public async Task ResendVerificationEmailByTokenAsync(string compositeToken, CancellationToken ct = default)
-        {
-            if (string.IsNullOrWhiteSpace(compositeToken))
-                throw new AppException(ResponseCodes.TOKEN_REQUIRED, ErrorMessages.Validation.TokenRequired);
-
-            // Extract email from token
-            string email;
-            try
-            {
-                email = _hashingService.ExtractEmailFromVerificationToken(compositeToken);
-            }
-            catch (ArgumentException)
-            {
-                throw new AppException(ResponseCodes.TOKEN_INVALID, ErrorMessages.Email.TokenInvalid);
-            }
-
-            // Reuse existing logic
-            await ResendVerificationEmailAsync(email, ct);
-        }
-
         public async Task<bool> VerifyEmailAsync(string token, CancellationToken ct = default)
         {
-            if (string.IsNullOrWhiteSpace(token)) throw new AppException(ResponseCodes.TOKEN_REQUIRED, ErrorMessages.Validation.TokenRequired);
+            if (string.IsNullOrWhiteSpace(token))
+                throw new AppException(ResponseCodes.TOKEN_REQUIRED, ErrorMessages.Validation.TokenRequired);
 
-            var user = await _userRepository.GetByVerificationTokenAsync(token, ct);
+            string actualToken = DecodeIfBase64Wrapped(token);
+
+            var user = await _userRepository.GetByVerificationTokenAsync(actualToken, ct);
 
             if (user == null)
             {
                 throw new AppException(ResponseCodes.TOKEN_INVALID, ErrorMessages.Email.TokenInvalid);
             }
 
-            if (user.IsEmailVerified) throw new AppException(ResponseCodes.EMAIL_ALREADY_VERIFIED, ErrorMessages.Email.AlreadyVerified);
+            if (user.IsEmailVerified)
+                throw new AppException(ResponseCodes.EMAIL_ALREADY_VERIFIED, ErrorMessages.Email.AlreadyVerified);
 
             if (!user.EmailVerificationTokenExpiry.HasValue || user.EmailVerificationTokenExpiry.Value <= _dateTimeProvider.UtcNow)
                 throw new AppException(ResponseCodes.TOKEN_EXPIRED, ErrorMessages.Email.TokenExpired);
 
-            int rows =  await _dapperUserRepository.VerifyEmailByTokenAsync(token, ct).ConfigureAwait(false);
+            int rows = await _dapperUserRepository.VerifyEmailByTokenAsync(actualToken, ct).ConfigureAwait(false);
 
             if (rows == 0)
             {
-                // No rows updated - likely already verified by a concurrent request
                 throw new AppException(ResponseCodes.EMAIL_ALREADY_VERIFIED, ErrorMessages.Email.AlreadyVerified);
             }
 
@@ -113,35 +94,57 @@ public async Task ResendVerificationEmailByTokenAsync(string compositeToken, Can
             return true;
         }
 
-        public async Task ResendVerificationEmailAsync(string email, CancellationToken ct = default)
+        public async Task ResendVerificationEmailAsync(string token, CancellationToken ct = default)
         {
-            if (string.IsNullOrWhiteSpace(email)) throw new AppException(ResponseCodes.EMAIL_REQUIRED, ErrorMessages.Validation.EmailRequired);
+            if (string.IsNullOrWhiteSpace(token))
+                throw new AppException(ResponseCodes.TOKEN_REQUIRED, ErrorMessages.Validation.TokenRequired);
+
+            string actualToken = DecodeIfBase64Wrapped(token);
+
+            string email;
+            try
+            {
+                email = _hashingService.ExtractEmailFromVerificationToken(actualToken);
+            }
+            catch (ArgumentException ex)
+            {
+                _logger?.LogWarning(ex, "Failed to extract email from verification token");
+                throw new AppException(ResponseCodes.TOKEN_INVALID, ErrorMessages.Email.TokenInvalid);
+            }
+
+            if (string.IsNullOrWhiteSpace(email))
+                throw new AppException(ResponseCodes.EMAIL_REQUIRED, ErrorMessages.Validation.EmailRequired);
 
             var user = await _userRepository.GetByEmailAsync(email, ct);
-            if (user == null) throw new KeyNotFoundException(ErrorMessages.General.ResourceNotFound);
 
-            if (user.IsEmailVerified) throw new AppException(ResponseCodes.EMAIL_ALREADY_VERIFIED, ErrorMessages.Email.AlreadyVerified);
+            if (user == null)
+                throw new KeyNotFoundException(ErrorMessages.General.ResourceNotFound);
+
+            if (user.IsEmailVerified)
+                throw new AppException(ResponseCodes.EMAIL_ALREADY_VERIFIED, ErrorMessages.Email.AlreadyVerified);
 
             var now = _dateTimeProvider.UtcNow;
-            if (user.LastEmailVerificationSentAt.HasValue && user.LastEmailVerificationSentAt.Value.AddHours(1) > now && user.EmailVerificationSentCount >= 3)
+            if (user.LastEmailVerificationSentAt.HasValue &&
+                user.LastEmailVerificationSentAt.Value.AddHours(1) > now &&
+                user.EmailVerificationSentCount >= 3)
             {
                 throw new AppException(ResponseCodes.TOO_MANY_RESEND_ATTEMPTS, ErrorMessages.Email.TooManyResendAttempts);
             }
 
-            var token = _hashingService.GenerateEmailVerificationToken(user.Email, 32);
-            user.EmailVerificationToken = token;
+            // Generate NEW token with the user's email
+            var newToken = _hashingService.GenerateEmailVerificationToken(user.Email, 32);
+            user.EmailVerificationToken = newToken;
             user.EmailVerificationTokenExpiry = _dateTimeProvider.UtcNow.AddDays(AppConstants.Security.EmailVerificationTokenExpirationDays);
             user.EmailVerificationSentCount++;
             user.LastEmailVerificationSentAt = now;
 
             await _unitOfWork.SaveChangesAsync(ct);
 
-            // Enqueue background job
             try
             {
                 _backgroundJobDispatcher.EnqueueVerificationEmail(user.Email, user.Username, user.EmailVerificationToken!);
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 _logger?.LogError(ex, "Failed to enqueue resend verification email for {Email}", user.Email);
                 throw new AppException(ResponseCodes.INTERNAL_SERVER_ERROR, ErrorMessages.Email.EmailSendFailed);
@@ -322,6 +325,31 @@ public async Task ResendVerificationEmailByTokenAsync(string compositeToken, Can
                 RefreshToken = newRefreshToken,
                 ExpiresIn = _jwtSettings.AccessTokenExpiryMinutes * 60
             };
+        }
+
+        private string DecodeIfBase64Wrapped(string token)
+        {
+            if (token.Contains('.'))
+            {
+                return token;
+            }
+
+            try
+            {
+                var bytes = Convert.FromBase64String(token);
+                var decoded = Encoding.UTF8.GetString(bytes);
+
+                if (decoded.Contains('.'))
+                {
+                    _logger?.LogDebug("Decoded base64-wrapped verification token");
+                    return decoded;
+                }
+            }
+            catch (FormatException)
+            {
+            }
+
+            return token;
         }
     }
 }
