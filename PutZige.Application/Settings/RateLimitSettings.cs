@@ -11,6 +11,7 @@ namespace PutZige.Application.Settings
         public FixedWindowPolicySettings Login { get; set; } = new FixedWindowPolicySettings();
         public FixedWindowPolicySettings RefreshToken { get; set; } = new FixedWindowPolicySettings();
         public FixedWindowPolicySettings Registration { get; set; } = new FixedWindowPolicySettings();
+        public FixedWindowPolicySettings EmailResend { get; set; } = new FixedWindowPolicySettings();
 
         public bool UseDistributedCache { get; set; } = false;
         public string? RedisConnectionString { get; set; }

@@ -24,6 +24,7 @@ namespace PutZige.API.Extensions
         private const string LoginPolicyName = "login";
         private const string RefreshTokenPolicyName = "refresh-token";
         private const string RegistrationPolicyName = "registration";
+        private const string EmailResendPolicyName = "email-resend";
         private const string GlobalPolicyName = "global-api";
 
         /// <summary>
@@ -109,6 +110,16 @@ namespace PutZige.API.Extensions
                         {
                             PermitLimit = settings.Registration.PermitLimit,
                             Window = TimeSpan.FromSeconds(settings.Registration.WindowSeconds),
+                            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                            QueueLimit = 0
+                        }));
+
+                    // Email resend uses stricter limits to prevent abuse of email sending
+                    options.AddPolicy(EmailResendPolicyName, httpContext =>
+                        RateLimitPartition.GetFixedWindowLimiter(GetPartitionKey(httpContext), _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = settings.EmailResend.PermitLimit,
+                            Window = TimeSpan.FromSeconds(settings.EmailResend.WindowSeconds),
                             QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                             QueueLimit = 0
                         }));
@@ -210,6 +221,10 @@ namespace PutZige.API.Extensions
                             case RegistrationPolicyName:
                                 limit = settings.Registration.PermitLimit;
                                 window = settings.Registration.WindowSeconds;
+                                break;
+                            case EmailResendPolicyName:
+                                limit = settings.EmailResend.PermitLimit;
+                                window = settings.EmailResend.WindowSeconds;
                                 break;
                         }
 

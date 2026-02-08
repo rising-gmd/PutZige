@@ -55,7 +55,7 @@ namespace PutZige.API.Controllers
         }
 
         [HttpPost("resend-verification")]
-        [EnableRateLimiting("api-general")]
+        [EnableRateLimiting("email-resend")]
         public async Task<ActionResult<ApiResponse<object>>> ResendVerification([FromBody] PutZige.Application.DTOs.Auth.ResendVerificationRequest request, CancellationToken ct)
         {
             await _authService.ResendVerificationEmailAsync(request.Token, ct);
