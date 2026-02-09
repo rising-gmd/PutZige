@@ -4,6 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Platform / Hosting / HTTP -->
+    <PackageVersion Include="Dapper" Version="2.1.66" />
     <PackageVersion Include="Hangfire.AspNetCore" Version="1.8.22" />
     <PackageVersion Include="Hangfire.Core" Version="1.8.22" />
     <PackageVersion Include="Hangfire.SqlServer" Version="1.8.22" />

@@ -18,4 +18,10 @@ public sealed class EmailSettings
     /// Base URL used to construct verification links. Should include scheme and host (e.g. https://example.com).
     /// </summary>
     public required string VerificationLinkBaseUrl { get; init; }
+
+    /// <summary>
+    /// Timeout in milliseconds for SMTP operations (connect/auth/send/disconnect).
+    /// Default is 5000 ms (5 seconds). Move configurable to appsettings so environments can tune it.
+    /// </summary>
+    public int SendTimeoutMs { get; init; } = 5000;
 }

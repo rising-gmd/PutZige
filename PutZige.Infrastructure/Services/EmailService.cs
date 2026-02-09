@@ -17,7 +17,6 @@ public sealed class EmailService : IEmailService
     private readonly EmailSettings _settings;
     private readonly ILogger<EmailService> _logger;
     private readonly string _templatePath;
-    private const int SendTimeoutMs = 5000; // 5 seconds
 
     public EmailService(IOptions<EmailSettings> options, ILogger<EmailService> logger)
     {
@@ -54,7 +53,7 @@ public sealed class EmailService : IEmailService
         message.To.Add(mailbox);
         message.Subject = "Please verify your email";
 
-        var bodyHtml = await BuildVerificationHtmlAsync(username, verificationToken, ct).ConfigureAwait(false);
+        var bodyHtml = await BuildVerificationHtmlAsync(username, verificationToken, toEmail, ct).ConfigureAwait(false);
         var builder = new BodyBuilder {HtmlBody = bodyHtml};
         message.Body = builder.ToMessageBody();
 
@@ -67,7 +66,7 @@ public sealed class EmailService : IEmailService
         throw new NotImplementedException();
     }
 
-    private async Task<string> BuildVerificationHtmlAsync(string username, string verificationToken, CancellationToken ct)
+    private async Task<string> BuildVerificationHtmlAsync(string username, string verificationToken, string toEmail, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
 
@@ -83,7 +82,8 @@ public sealed class EmailService : IEmailService
         }
 
         var tokenEncoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(verificationToken));
-        var verificationLink = new Uri(new Uri(_settings.VerificationLinkBaseUrl), $"/api/v1/auth/verify-email?email={Uri.EscapeDataString(username)}&token={Uri.EscapeDataString(tokenEncoded)}");
+        var verificationLink = $"{_settings.VerificationLinkBaseUrl}?token={Uri.EscapeDataString(tokenEncoded)}";
+
 
         var expiryHours = TimeSpan.FromDays(1).TotalHours; // keep default until constants wired
 
@@ -101,7 +101,7 @@ public sealed class EmailService : IEmailService
         {
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
-            timeoutCts.CancelAfter(SendTimeoutMs);
+            timeoutCts.CancelAfter(_settings.SendTimeoutMs);
 
             var secureSocket = _settings.EnableSsl ? SecureSocketOptions.StartTls : SecureSocketOptions.Auto;
 

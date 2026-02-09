@@ -15,39 +15,15 @@ namespace PutZige.Application.Tests.Validators
         [Fact]
         public void VerifyEmailRequestValidator_ValidRequest_PassesValidation()
         {
-            var req = new VerifyEmailRequest("user@ex.com", "token123");
+            var req = new VerifyEmailRequest("token123");
             var result = _verify.Validate(req);
             result.IsValid.Should().BeTrue();
         }
 
         [Fact]
-        public void VerifyEmailRequestValidator_NullEmail_FailsValidation()
-        {
-            var req = new VerifyEmailRequest(null!, "token");
-            var result = _verify.Validate(req);
-            result.IsValid.Should().BeFalse();
-        }
-
-        [Fact]
-        public void VerifyEmailRequestValidator_EmptyEmail_FailsValidation()
-        {
-            var req = new VerifyEmailRequest("", "token");
-            var result = _verify.Validate(req);
-            result.IsValid.Should().BeFalse();
-        }
-
-        [Fact]
-        public void VerifyEmailRequestValidator_InvalidEmailFormat_FailsValidation()
-        {
-            var req = new VerifyEmailRequest("not-an-email", "token");
-            var result = _verify.Validate(req);
-            result.IsValid.Should().BeFalse();
-        }
-
-        [Fact]
         public void VerifyEmailRequestValidator_NullToken_FailsValidation()
         {
-            var req = new VerifyEmailRequest("user@ex.com", null!);
+            var req = new VerifyEmailRequest(null!);
             var result = _verify.Validate(req);
             result.IsValid.Should().BeFalse();
         }
@@ -55,7 +31,7 @@ namespace PutZige.Application.Tests.Validators
         [Fact]
         public void VerifyEmailRequestValidator_EmptyToken_FailsValidation()
         {
-            var req = new VerifyEmailRequest("user@ex.com", "");
+            var req = new VerifyEmailRequest("");
             var result = _verify.Validate(req);
             result.IsValid.Should().BeFalse();
         }
@@ -63,7 +39,7 @@ namespace PutZige.Application.Tests.Validators
         [Fact]
         public void VerifyEmailRequestValidator_WhitespaceToken_FailsValidation()
         {
-            var req = new VerifyEmailRequest("user@ex.com", "   ");
+            var req = new VerifyEmailRequest("   ");
             var result = _verify.Validate(req);
             result.IsValid.Should().BeFalse();
         }
@@ -93,11 +69,12 @@ namespace PutZige.Application.Tests.Validators
         }
 
         [Fact]
-        public void ResendVerificationRequestValidator_InvalidEmailFormat_FailsValidation()
+        public void ResendVerificationRequestValidator_NonEmailToken_PassesValidation()
         {
             var req = new ResendVerificationRequest("not-an-email");
             var result = _resend.Validate(req);
-            result.IsValid.Should().BeFalse();
+            // Resend now accepts a token (may contain arbitrary characters) so any non-empty string is valid
+            result.IsValid.Should().BeTrue();
         }
     }
 }

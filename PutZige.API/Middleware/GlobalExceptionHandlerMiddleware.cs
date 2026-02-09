@@ -10,6 +10,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using PutZige.Application.DTOs.Common;
 using PutZige.Application.Common.Messages;
+using PutZige.Application.Common;
+using PutZige.Application.Common.Constants;
 
 namespace PutZige.API.Middleware
 {
@@ -40,7 +42,7 @@ namespace PutZige.API.Middleware
             }
             catch (Exception ex)
             {
-                var (status, message, errors) = MapException(ex, context);
+                var (status, responseCode, message, errors, metadata) = MapException(ex, context);
 
                 if (status >= StatusCodes.Status500InternalServerError)
                 {
@@ -54,23 +56,24 @@ namespace PutZige.API.Middleware
                 context.Response.ContentType = "application/json";
                 context.Response.StatusCode = status;
 
-                var response = ApiResponse<object>.Error(message, errors, status);
+                var response = ApiResponse<object>.Error(responseCode, message, errors, status, metadata);
                 var json = JsonSerializer.Serialize(response, _jsonOptions);
                 await context.Response.WriteAsync(json);
             }
         }
 
-        private static (int status, string message, Dictionary<string, string[]>? errors) MapException(Exception ex, HttpContext context)
+        private static (int status, string responseCode, string message, Dictionary<string, string[]>? errors, Dictionary<string, object>? metadata) MapException(Exception ex, HttpContext context)
         {
             return ex switch
             {
-                ValidationException ve => (StatusCodes.Status400BadRequest, ErrorMessages.Validation.ValidationFailed, BuildValidationErrors(ve)),
-                InvalidOperationException ioe => (StatusCodes.Status400BadRequest, ioe.Message, null),
-                KeyNotFoundException knf => (StatusCodes.Status404NotFound, ErrorMessages.General.ResourceNotFound, null),
-                UnauthorizedAccessException una => (StatusCodes.Status401Unauthorized, ErrorMessages.General.UnauthorizedAccess, null),
-                ArgumentNullException an => (StatusCodes.Status400BadRequest, an.Message, null),
-                ArgumentException ae => (StatusCodes.Status400BadRequest, ae.Message, null),
-                _ => (StatusCodes.Status500InternalServerError, ErrorMessages.General.InternalServerError, null)
+                FluentValidation.ValidationException ve => (StatusCodes.Status400BadRequest, ResponseCodes.VALIDATION_FAILED, ErrorMessages.Validation.ValidationFailed, BuildValidationErrors(ve), null),
+                AppException appEx => (StatusCodes.Status400BadRequest, appEx.ResponseCode ?? ResponseCodes.INTERNAL_SERVER_ERROR, appEx.Message ?? string.Empty, null, appEx.Metadata),
+                InvalidOperationException ioe => (StatusCodes.Status400BadRequest, ResponseCodes.VALIDATION_FAILED, ioe.Message, null, null),
+                KeyNotFoundException knf => (StatusCodes.Status404NotFound, ResponseCodes.NOT_FOUND, ErrorMessages.General.ResourceNotFound, null, null),
+                UnauthorizedAccessException una => (StatusCodes.Status401Unauthorized, ResponseCodes.UNAUTHORIZED, ErrorMessages.General.UnauthorizedAccess, null, null),
+                ArgumentNullException an => (StatusCodes.Status400BadRequest, ResponseCodes.VALIDATION_FAILED, an.Message, null, null),
+                ArgumentException ae => (StatusCodes.Status400BadRequest, ResponseCodes.VALIDATION_FAILED, ae.Message, null, null),
+                _ => (StatusCodes.Status500InternalServerError, ResponseCodes.INTERNAL_SERVER_ERROR, ErrorMessages.General.InternalServerError, null, null)
             };
         }
 

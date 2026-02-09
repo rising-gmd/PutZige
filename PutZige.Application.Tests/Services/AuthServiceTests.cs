@@ -29,6 +29,8 @@ namespace PutZige.Application.Tests.Services
         private readonly Mock<IClientInfoService> _mockClientInfo = new();
         private readonly Mock<IHashingService> _mockHashingService = new();
         private readonly Mock<IDateTimeProvider> _mockDateTime = new();
+        private readonly Mock<PutZige.Domain.Interfaces.IDapperUserRepository> _dapperUserRepo = new();
+        private readonly Mock<IBackgroundJobDispatcher> _backgroundDispatcher = new();
 
         private readonly JwtSettings _jwtSettings = new() { Secret = "TestSecretKeyThatIsLongEnough-1234567890", Issuer = "PutZige", Audience = "PutZige.Users", AccessTokenExpiryMinutes = 15, RefreshTokenExpiryDays = 7 };
 
@@ -68,7 +70,7 @@ namespace PutZige.Application.Tests.Services
             _userRepo.Setup(x => x.GetByUsernameWithSessionAsync(username, It.IsAny<CancellationToken>())).ReturnsAsync(user);
             _uow.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
-            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _logger.Object);
+            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
 
             // Act
             var result = await svc.LoginAsync(username, password, CancellationToken.None);
@@ -92,13 +94,13 @@ namespace PutZige.Application.Tests.Services
             var username = "nouser";
             _userRepo.Setup(x => x.GetByUsernameWithSessionAsync(username, It.IsAny<CancellationToken>())).ReturnsAsync((User?)null);
 
-            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _logger.Object);
+            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
 
             // Act
             Func<Task> act = async () => await svc.LoginAsync(username, "any", CancellationToken.None);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.InvalidCredentials + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.InvalidCredentials + "*");
         }
 
         /// <summary>
@@ -125,7 +127,7 @@ namespace PutZige.Application.Tests.Services
             _userRepo.Setup(x => x.GetByEmailWithSessionAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
             _uow.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
-            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _logger.Object);
+            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
 
             // Act
             var result = await svc.LoginAsync(email, password, CancellationToken.None);
@@ -166,20 +168,20 @@ namespace PutZige.Application.Tests.Services
             _userRepo.Setup(x => x.GetByEmailWithSessionAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(() => user);
             _uow.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
-            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _logger.Object);
+            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
 
             // Act & Assert: perform 4 failed attempts
             for (int i = 1; i <= 4; i++)
             {
                 Func<Task> act = async () => await svc.LoginAsync(email, wrong, CancellationToken.None);
-                await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.InvalidCredentials + "*");
+                await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.InvalidCredentials + "*");
                 user.FailedLoginAttempts.Should().Be(i);
                 user.IsLocked.Should().BeFalse();
             }
 
             // 5th attempt locks
             Func<Task> act5 = async () => await svc.LoginAsync(email, wrong, CancellationToken.None);
-            await act5.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.InvalidCredentials + "*");
+            await act5.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.InvalidCredentials + "*");
             user.FailedLoginAttempts.Should().Be(5);
             user.IsLocked.Should().BeTrue();
             user.LockedUntil.Should().BeAfter(DateTime.UtcNow);
@@ -209,13 +211,13 @@ namespace PutZige.Application.Tests.Services
 
             _userRepo.Setup(x => x.GetByEmailWithSessionAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
 
-            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _logger.Object);
+            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
 
             // Act
             Func<Task> act = async () => await svc.LoginAsync(email, password, CancellationToken.None);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.AccountLocked + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.AccountLocked + "*");
         }
 
         /// <summary>
@@ -228,13 +230,13 @@ namespace PutZige.Application.Tests.Services
             var email = "noexist@test.com";
             _userRepo.Setup(x => x.GetByEmailWithSessionAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync((User?)null);
 
-            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _logger.Object);
+            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
 
             // Act
             Func<Task> act = async () => await svc.LoginAsync(email, "any", CancellationToken.None);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.InvalidCredentials + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.InvalidCredentials + "*");
         }
 
         /// <summary>
@@ -248,10 +250,10 @@ namespace PutZige.Application.Tests.Services
             var user = new User { Email = email, PasswordHash = "hash-P1!", PasswordSalt = "salt-P1!", IsActive = false, IsEmailVerified = true };
             _userRepo.Setup(x => x.GetByEmailWithSessionAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
 
-            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _logger.Object);
+            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
 
             Func<Task> act = async () => await svc.LoginAsync(email, "P1!", CancellationToken.None);
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.AccountInactive + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.AccountInactive + "*");
         }
 
         /// <summary>
@@ -265,10 +267,10 @@ namespace PutZige.Application.Tests.Services
             var user = new User { Email = email, PasswordHash = "hash-P1!", PasswordSalt = "salt-P1!", IsActive = true, IsEmailVerified = false };
             _userRepo.Setup(x => x.GetByEmailWithSessionAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
 
-            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _logger.Object);
+            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
 
             Func<Task> act = async () => await svc.LoginAsync(email, "P1!", CancellationToken.None);
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.EmailNotVerified + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.EmailNotVerified + "*");
         }
 
         /// <summary>
@@ -300,7 +302,7 @@ namespace PutZige.Application.Tests.Services
             _userRepo.Setup(x => x.GetByRefreshTokenAsync("valid-refresh", It.IsAny<CancellationToken>())).ReturnsAsync(user);
             _uow.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
-            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _logger.Object);
+            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
 
             // Act
             var resp = await svc.RefreshTokenAsync("valid-refresh", CancellationToken.None);
@@ -334,12 +336,12 @@ namespace PutZige.Application.Tests.Services
 
             _userRepo.Setup(x => x.GetByRefreshTokenAsync("old-refresh", It.IsAny<CancellationToken>())).ReturnsAsync(user);
 
-            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _logger.Object);
+            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
 
             // Act
             Func<Task> act = async () => await svc.RefreshTokenAsync("old-refresh", CancellationToken.None);
 
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.InvalidRefreshToken + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.InvalidRefreshToken + "*");
         }
 
         /// <summary>
@@ -351,10 +353,10 @@ namespace PutZige.Application.Tests.Services
             // Arrange
             _userRepo.Setup(x => x.GetByRefreshTokenAsync("bad-token", It.IsAny<CancellationToken>())).ReturnsAsync((User?)null);
 
-            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _logger.Object);
+            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
 
             Func<Task> act = async () => await svc.RefreshTokenAsync("bad-token", CancellationToken.None);
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.InvalidRefreshToken + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.InvalidRefreshToken + "*");
         }
 
         /// <summary>
@@ -383,7 +385,7 @@ namespace PutZige.Application.Tests.Services
             _userRepo.Setup(x => x.GetByEmailWithSessionAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
             _uow.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
-            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _logger.Object);
+            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
 
             // Act
             var resp = await svc.LoginAsync(email, password, CancellationToken.None);
@@ -420,7 +422,7 @@ namespace PutZige.Application.Tests.Services
             _userRepo.Setup(x => x.GetByEmailWithSessionAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
             _uow.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
-            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _logger.Object);
+            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
 
             // Act
             var resp = await svc.LoginAsync(email, password, CancellationToken.None);
@@ -455,13 +457,13 @@ namespace PutZige.Application.Tests.Services
 
             _userRepo.Setup(x => x.GetByEmailWithSessionAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
 
-            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _logger.Object);
+            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
 
             // Act
             Func<Task> act = async () => await svc.LoginAsync(email, password, CancellationToken.None);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.AccountLocked + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.AccountLocked + "*");
         }
 
         /// <summary>
@@ -487,7 +489,7 @@ namespace PutZige.Application.Tests.Services
             _userRepo.Setup(x => x.GetByEmailWithSessionAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
             _uow.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
-            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _logger.Object);
+            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
 
             // Act
             var resp = await svc.LoginAsync(email, password, CancellationToken.None);
@@ -521,7 +523,7 @@ namespace PutZige.Application.Tests.Services
             _userRepo.Setup(x => x.GetByEmailWithSessionAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
             _uow.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
-            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _logger.Object);
+            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
 
             // Act
             var resp = await svc.LoginAsync(email, password, CancellationToken.None);
@@ -566,7 +568,7 @@ namespace PutZige.Application.Tests.Services
             _userRepo.Setup(x => x.GetByEmailWithSessionAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
             _uow.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
-            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _logger.Object);
+            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
 
             // Act
             var resp = await svc.LoginAsync(email, password, CancellationToken.None);
@@ -601,13 +603,13 @@ namespace PutZige.Application.Tests.Services
             _userRepo.Setup(x => x.GetByRefreshTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(user);
             _mockHashingService.Setup(h => h.VerifyAsync(token, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
-            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _logger.Object);
+            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
 
             // Act
             Func<Task> act = async () => await svc.RefreshTokenAsync(token, CancellationToken.None);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.InvalidRefreshToken + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.InvalidRefreshToken + "*");
         }
 
         /// <summary>
@@ -627,13 +629,13 @@ namespace PutZige.Application.Tests.Services
 
             _userRepo.Setup(x => x.GetByRefreshTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(user);
 
-            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _logger.Object);
+            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
 
             // Act
             Func<Task> act = async () => await svc.RefreshTokenAsync(token, CancellationToken.None);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.InvalidRefreshToken + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.InvalidRefreshToken + "*");
         }
 
         /// <summary>
@@ -663,7 +665,7 @@ namespace PutZige.Application.Tests.Services
             _mockHashingService.Setup(h => h.HashAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((string s, CancellationToken ct) => new HashedValue("newhash-"+s, "newsalt-"+s));
             _uow.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
-            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _logger.Object);
+            var svc = new AuthService(_userRepo.Object, _uow.Object, CreateJwtService(), _userService.Object, _mapper.Object, Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
 
             // Act
             var resp = await svc.RefreshTokenAsync(token, CancellationToken.None);

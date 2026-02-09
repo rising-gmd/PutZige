@@ -14,6 +14,7 @@ namespace PutZige.Application.Validators
             RuleFor(x => x.Login).NotNull().SetValidator(new FixedWindowPolicySettingsValidator());
             RuleFor(x => x.RefreshToken).NotNull().SetValidator(new FixedWindowPolicySettingsValidator());
             RuleFor(x => x.Registration).NotNull().SetValidator(new FixedWindowPolicySettingsValidator());
+            RuleFor(x => x.EmailResend).NotNull().SetValidator(new FixedWindowPolicySettingsValidator());
 
             RuleFor(x => x.UseDistributedCache).NotNull();
             When(x => x.UseDistributedCache, () =>

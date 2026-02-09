@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Dapper" />
     <PackageReference Include="Hangfire.Core" />
     <PackageReference Include="MailKit" />
     <PackageReference Include="Microsoft.AspNetCore.Http" />

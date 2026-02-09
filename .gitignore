@@ -435,3 +435,9 @@ appsettings.Test.json
 *.p12
 *.key
 *.pem
+
+
+# -------------------------
+# Copilot Files
+# -------------------------
+.github/

@@ -44,5 +44,20 @@ namespace PutZige.Domain.Interfaces
         /// Gets a user by refresh token via session.
         /// </summary>
         Task<User?> GetByRefreshTokenAsync(string refreshToken, CancellationToken ct = default);
+        
+        /// <summary>
+        /// Gets a user by email verification token.
+        /// </summary>
+        Task<User?> GetByVerificationTokenAsync(string token, CancellationToken ct = default);
+
+        /// <summary>
+        /// Atomically verifies an email by token. Returns number of rows affected.
+        /// </summary>
+        Task<int> VerifyEmailByTokenAsync(string token, CancellationToken ct = default);
+
+        /// <summary>
+        /// Gets a user by email with tracking enabled for updates.
+        /// </summary>
+        Task<User?> GetByEmailForUpdateAsync(string email, CancellationToken ct = default);
     }
 }

@@ -116,7 +116,7 @@ public partial class MessagingServiceTests
         Func<Task> act = async () => await _sut.SendMessageAsync(sender, receiver, longText, _ct);
 
         // Assert
-        await act.Should().ThrowAsync<ArgumentException>();
+        await act.Should().ThrowAsync<PutZige.Application.Common.AppException>();
     }
 
     /// <summary>
@@ -153,7 +153,7 @@ public partial class MessagingServiceTests
         Func<Task> act = async () => await _sut.SendMessageAsync(sender, receiver, "   ", _ct);
 
         // Assert
-        await act.Should().ThrowAsync<ArgumentException>();
+        await act.Should().ThrowAsync<PutZige.Application.Common.AppException>();
     }
 
     /// <summary>

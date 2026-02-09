@@ -7,6 +7,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
+using System.Text;
 using PutZige.Application.Common.Constants;
 using PutZige.Application.Common.Messages;
 using PutZige.Application.Interfaces;
@@ -25,16 +26,27 @@ namespace PutZige.Application.Tests.Services
         private readonly Mock<IUnitOfWork> _uow = new();
         private readonly Mock<IMapper> _mapper = new();
         private readonly Mock<IHashingService> _hashing = new();
+        private readonly Mock<IDateTimeProvider> _mockDateTime = new();
         private readonly Mock<IBackgroundJobDispatcher> _bg = new();
         private readonly Mock<ILogger<UserService>> _logger = new();
 
         public UserServiceEmailTests()
         {
+            _mockDateTime.Setup(d => d.UtcNow).Returns(DateTime.UtcNow);
             _hashing.Setup(h => h.GenerateSecureToken(It.IsAny<int>())).Returns((int len) => {
                 var bytes = new byte[Math.Max(1, len)];
                 System.Security.Cryptography.RandomNumberGenerator.Fill(bytes);
                 return Convert.ToBase64String(bytes).Replace("+","-").Replace("/","_").TrimEnd('=');
             });
+            _hashing.Setup(h => h.GenerateEmailVerificationToken(It.IsAny<string>(), It.IsAny<int>()))
+                .Returns((string emailArg, int len) =>
+                {
+                    var bytes = new byte[Math.Max(1, len)];
+                    System.Security.Cryptography.RandomNumberGenerator.Fill(bytes);
+                    var random = Convert.ToBase64String(bytes).Replace("+","-").Replace("/","_").TrimEnd('=');
+                    var encodedEmail = Convert.ToBase64String(Encoding.UTF8.GetBytes(emailArg)).Replace("+","-").Replace("/","_").TrimEnd('=');
+                    return $"{random}.{encodedEmail}";
+                });
             _hashing.Setup(h => h.HashAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((string s, CancellationToken ct) => new PutZige.Application.DTOs.HashedValue("hash-"+s, "salt-"+s));
             _uow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
             _mapper.Setup(m => m.Map<RegisterUserResponse>(It.IsAny<User>())).Returns((User u) => new RegisterUserResponse
@@ -122,7 +134,7 @@ namespace PutZige.Application.Tests.Services
             var pwd = "Password1!";
 
             var mockLogger = new Mock<ILogger<UserService>>();
-            var svc = new UserService(_userRepo.Object, _uow.Object, _mapper.Object, _hashing.Object, _bg.Object, mockLogger.Object);
+            var svc = new UserService(_userRepo.Object, _uow.Object, _mapper.Object, _hashing.Object, _mockDateTime.Object, _bg.Object, mockLogger.Object);
 
             _userRepo.Setup(r => r.IsEmailTakenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
             _userRepo.Setup(r => r.IsUsernameTakenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
@@ -144,7 +156,7 @@ namespace PutZige.Application.Tests.Services
 
         private UserService CreateSvc()
         {
-            return new UserService(_userRepo.Object, _uow.Object, _mapper.Object, _hashing.Object, _bg.Object, _logger.Object);
+            return new UserService(_userRepo.Object, _uow.Object, _mapper.Object, _hashing.Object, _mockDateTime.Object, _bg.Object, _logger.Object);
         }
 
         [Fact]
@@ -189,7 +201,12 @@ namespace PutZige.Application.Tests.Services
 
             // Assert
             captured.Should().NotBeNull();
-            var b64 = captured!.EmailVerificationToken!.Replace('-', '+').Replace('_', '/');
+            // Extract random portion before the dot
+            var composite = captured!.EmailVerificationToken!;
+            var parts = composite.Split('.', 2);
+            parts.Length.Should().Be(2);
+            var randomPart = parts[0];
+            var b64 = randomPart.Replace('-', '+').Replace('_', '/');
             // Restore padding for base64 if trimmed
             switch (b64.Length % 4)
             {
