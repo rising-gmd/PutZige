@@ -30,9 +30,20 @@ namespace PutZige.Application.DTOs.Common
         public string Message { get; init; } = string.Empty;
 
         /// <summary>
+        /// <summary>
         /// Optional validation or domain errors keyed by field.
         /// </summary>
         public Dictionary<string, string[]>? Errors { get; init; }
+
+        /// <summary>
+        /// Canonical response code that clients can use for i18n and handling.
+        /// </summary>
+        public string ResponseCode { get; init; } = string.Empty;
+
+        /// <summary>
+        /// Optional metadata for additional structured information.
+        /// </summary>
+        public Dictionary<string, object>? Metadata { get; init; }
 
         /// <summary>
         /// Optional HTTP status code associated with the response.
@@ -47,12 +58,14 @@ namespace PutZige.Application.DTOs.Common
         /// <summary>
         /// Creates a successful ApiResponse containing data.
         /// </summary>
-        public static ApiResponse<T> Success(T data, string message = "")
+        public static ApiResponse<T> Success(T data, string responseCode, string? message = null, Dictionary<string, object>? metadata = null)
             => new()
             {
                 IsSuccess = true,
                 Data = data,
-                Message = string.IsNullOrWhiteSpace(message) ? SuccessMessages.General.OperationSuccessful : message,
+                ResponseCode = responseCode ?? string.Empty,
+                Message = string.IsNullOrWhiteSpace(message) ? SuccessMessages.General.OperationSuccessful : message ?? string.Empty,
+                Metadata = metadata,
                 StatusCode = StatusCodes.Status200OK,
                 Timestamp = DateTime.UtcNow
             };
@@ -60,13 +73,15 @@ namespace PutZige.Application.DTOs.Common
         /// <summary>
         /// Creates an error ApiResponse with optional errors dictionary and status code.
         /// </summary>
-        public static ApiResponse<T> Error(string message, Dictionary<string, string[]>? errors = null, int statusCode = StatusCodes.Status400BadRequest)
+        public static ApiResponse<T> Error(string responseCode, string? message = null, Dictionary<string, string[]>? errors = null, int statusCode = StatusCodes.Status400BadRequest, Dictionary<string, object>? metadata = null)
             => new()
             {
                 IsSuccess = false,
                 Data = default,
-                Message = string.IsNullOrWhiteSpace(message) ? ErrorMessages.General.InternalServerError : message,
+                ResponseCode = responseCode ?? string.Empty,
+                Message = string.IsNullOrWhiteSpace(message) ? ErrorMessages.General.InternalServerError : message ?? string.Empty,
                 Errors = errors,
+                Metadata = metadata,
                 StatusCode = statusCode,
                 Timestamp = DateTime.UtcNow
             };

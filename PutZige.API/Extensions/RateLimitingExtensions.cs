@@ -15,6 +15,7 @@ using FluentValidation;
 using FluentValidation.Results;
 using System.Threading.Tasks;
 using PutZige.Application.Common.Messages;
+using PutZige.Application.Common.Constants;
 
 namespace PutZige.API.Extensions
 {
@@ -23,6 +24,7 @@ namespace PutZige.API.Extensions
         private const string LoginPolicyName = "login";
         private const string RefreshTokenPolicyName = "refresh-token";
         private const string RegistrationPolicyName = "registration";
+        private const string EmailResendPolicyName = "email-resend";
         private const string GlobalPolicyName = "global-api";
 
         /// <summary>
@@ -108,6 +110,16 @@ namespace PutZige.API.Extensions
                         {
                             PermitLimit = settings.Registration.PermitLimit,
                             Window = TimeSpan.FromSeconds(settings.Registration.WindowSeconds),
+                            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                            QueueLimit = 0
+                        }));
+
+                    // Email resend uses stricter limits to prevent abuse of email sending
+                    options.AddPolicy(EmailResendPolicyName, httpContext =>
+                        RateLimitPartition.GetFixedWindowLimiter(GetPartitionKey(httpContext), _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = settings.EmailResend.PermitLimit,
+                            Window = TimeSpan.FromSeconds(settings.EmailResend.WindowSeconds),
                             QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                             QueueLimit = 0
                         }));
@@ -210,6 +222,10 @@ namespace PutZige.API.Extensions
                                 limit = settings.Registration.PermitLimit;
                                 window = settings.Registration.WindowSeconds;
                                 break;
+                            case EmailResendPolicyName:
+                                limit = settings.EmailResend.PermitLimit;
+                                window = settings.EmailResend.WindowSeconds;
+                                break;
                         }
 
                         logger2?.LogWarning("Rate limit exceeded: Policy={PolicyName}, Endpoint={Endpoint}, Partition={Partition}, Limit={Limit}, Window={WindowSeconds}s, Algorithm={Algorithm}",
@@ -217,7 +233,7 @@ namespace PutZige.API.Extensions
 
                         var retryAfter = window;
 
-                        var apiPayload = ApiResponse<object>.Error(ErrorMessages.RateLimit.Exceeded, null, StatusCodes.Status429TooManyRequests);
+                        var apiPayload = ApiResponse<object>.Error(ResponseCodes.VALIDATION_FAILED, ErrorMessages.RateLimit.Exceeded, null, StatusCodes.Status429TooManyRequests);
 
                         var response = httpContext?.Response;
                         if (response != null)

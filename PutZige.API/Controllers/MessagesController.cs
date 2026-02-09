@@ -9,6 +9,7 @@ using PutZige.Application.DTOs.Messaging;
 using PutZige.Application.Interfaces;
 using PutZige.Application.Common.Messages;
 using PutZige.Application.DTOs.Common;
+using PutZige.Application.Common.Constants;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace PutZige.API.Controllers;
@@ -30,26 +31,26 @@ public sealed class MessagesController : BaseApiController
 
     [HttpPost]
     [EnableRateLimiting("api-general")]
-    public async Task<ActionResult<ApiResponse<SendMessageResponse>>> SendMessage([FromBody] SendMessageRequest request, CancellationToken ct)
-    {
-        var userId = _currentUserService.GetUserId();
-        var response = await _messagingService.SendMessageAsync(userId, request.ReceiverId, request.MessageText, ct);
-        return Created(response, SuccessMessages.Messaging.MessageSent);
-    }
+        public async Task<ActionResult<ApiResponse<SendMessageResponse>>> SendMessage([FromBody] SendMessageRequest request, CancellationToken ct)
+        {
+            var userId = _currentUserService.GetUserId();
+            var response = await _messagingService.SendMessageAsync(userId, request.ReceiverId, request.MessageText, ct);
+            return Created(response, ResponseCodes.LOGIN_SUCCESS, SuccessMessages.Messaging.MessageSent);
+        }
 
     [HttpGet("conversation/{otherUserId}")]
     [EnableRateLimiting("api-general")]
-    public async Task<ActionResult<ApiResponse<ConversationHistoryResponse>>> GetConversation(Guid otherUserId, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 50, CancellationToken ct = default)
-    {
-        var userId = _currentUserService.GetUserId();
-        var response = await _messagingService.GetConversationHistoryAsync(userId, otherUserId, pageNumber, pageSize, ct);
-        return Ok(ApiResponse<ConversationHistoryResponse>.Success(response));
-    }
+        public async Task<ActionResult<ApiResponse<ConversationHistoryResponse>>> GetConversation(Guid otherUserId, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 50, CancellationToken ct = default)
+        {
+            var userId = _currentUserService.GetUserId();
+            var response = await _messagingService.GetConversationHistoryAsync(userId, otherUserId, pageNumber, pageSize, ct);
+            return Success(response, ResponseCodes.LOGIN_SUCCESS);
+        }
 
     [HttpPatch("{messageId}/read")]
-    public async Task<ActionResult<ApiResponse<object>>> MarkAsRead(Guid messageId, CancellationToken ct = default)
-    {
-        await _messagingService.MarkMessageAsReadAsync(messageId, ct);
-        return Ok(ApiResponse<object>.Success(null, SuccessMessages.Messaging.MessageMarkedAsRead));
-    }
+        public async Task<ActionResult<ApiResponse<object>>> MarkAsRead(Guid messageId, CancellationToken ct = default)
+        {
+            await _messagingService.MarkMessageAsReadAsync(messageId, ct);
+            return Success<object>(null, ResponseCodes.LOGIN_SUCCESS, SuccessMessages.Messaging.MessageMarkedAsRead);
+        }
 }

@@ -89,5 +89,51 @@ namespace PutZige.Infrastructure.Services
             var token = Convert.ToBase64String(bytes).Replace("+", "-").Replace("/", "_").TrimEnd('=');
             return token;
         }
+
+        public string GenerateEmailVerificationToken(string email, int randomByteLength = 32)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+                throw new ArgumentException("Email is required", nameof(email));
+
+            // Generate secure random token
+            var randomToken = GenerateSecureToken(randomByteLength);
+
+            // Base64URL encode the email
+            var emailBytes = Encoding.UTF8.GetBytes(email);
+            var encodedEmail = Convert.ToBase64String(emailBytes)
+                .Replace("+", "-")
+                .Replace("/", "_")
+                .TrimEnd('=');
+
+            // Composite format: {randomToken}.{encodedEmail}
+            return $"{randomToken}.{encodedEmail}";
+        }
+
+        public string ExtractEmailFromVerificationToken(string compositeToken)
+        {
+            if (string.IsNullOrWhiteSpace(compositeToken))
+                throw new ArgumentException("Token is required", nameof(compositeToken));
+
+            var parts = compositeToken.Split('.');
+            if (parts.Length != 2)
+                throw new ArgumentException("Invalid token format", nameof(compositeToken));
+
+            try
+            {
+                // Decode the email part (add padding if needed)
+                var encodedEmail = parts[1];
+                var padding = (4 - (encodedEmail.Length % 4)) % 4;
+                var base64 = encodedEmail
+                    .Replace("-", "+")
+                    .Replace("_", "/") + new string('=', padding);
+
+                var emailBytes = Convert.FromBase64String(base64);
+                return Encoding.UTF8.GetString(emailBytes);
+            }
+            catch (Exception ex)
+            {
+                throw new ArgumentException("Failed to decode email from token", nameof(compositeToken), ex);
+            }
+        }
     }
 }

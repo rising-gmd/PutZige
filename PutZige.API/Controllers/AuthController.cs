@@ -8,6 +8,7 @@ using PutZige.Application.DTOs.Auth;
 using PutZige.Application.DTOs.Common;
 using PutZige.Application.Interfaces;
 using PutZige.Application.Common.Messages;
+using PutZige.Application.Common.Constants;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace PutZige.API.Controllers
@@ -32,7 +33,7 @@ namespace PutZige.API.Controllers
         public async Task<ActionResult<ApiResponse<LoginResponse>>> Login([FromBody] LoginRequest request, CancellationToken ct)
         {
             var response = await _authService.LoginAsync(request.Identifier, request.Password, ct);
-            return Ok(ApiResponse<LoginResponse>.Success(response, SuccessMessages.Authentication.LoginSuccessful));
+            return Success(response, ResponseCodes.LOGIN_SUCCESS, SuccessMessages.Authentication.LoginSuccessful);
         }
 
         /// <summary>
@@ -43,22 +44,22 @@ namespace PutZige.API.Controllers
         public async Task<ActionResult<ApiResponse<RefreshTokenResponse>>> RefreshToken([FromBody] RefreshTokenRequest request, CancellationToken ct)
         {
             var response = await _authService.RefreshTokenAsync(request.RefreshToken, ct);
-            return Ok(ApiResponse<RefreshTokenResponse>.Success(response, SuccessMessages.Authentication.TokenRefreshed));
+            return Success(response, ResponseCodes.LOGIN_SUCCESS, SuccessMessages.Authentication.TokenRefreshed);
         }
 
         [HttpPost("verify-email")]
         public async Task<ActionResult<ApiResponse<object>>> VerifyEmail([FromBody] PutZige.Application.DTOs.Auth.VerifyEmailRequest request, CancellationToken ct)
         {
-            await _authService.VerifyEmailAsync(request.Email, request.Token, ct);
-            return Ok(ApiResponse<object>.Success(null, SuccessMessages.Authentication.EmailVerified));
+            await _authService.VerifyEmailAsync(request.Token, ct);
+            return Success<object>(null, ResponseCodes.EMAIL_VERIFIED, SuccessMessages.Authentication.EmailVerified);
         }
 
         [HttpPost("resend-verification")]
-        [EnableRateLimiting("api-general")]
+        [EnableRateLimiting("email-resend")]
         public async Task<ActionResult<ApiResponse<object>>> ResendVerification([FromBody] PutZige.Application.DTOs.Auth.ResendVerificationRequest request, CancellationToken ct)
         {
-            await _authService.ResendVerificationEmailAsync(request.Email, ct);
-            return Ok(ApiResponse<object>.Success(null, SuccessMessages.Authentication.VerificationEmailSent));
+            await _authService.ResendVerificationEmailAsync(request.Token, ct);
+            return Success<object>(null, ResponseCodes.EMAIL_VERIFICATION_SENT, SuccessMessages.Authentication.VerificationEmailSent);
         }
     }
 }

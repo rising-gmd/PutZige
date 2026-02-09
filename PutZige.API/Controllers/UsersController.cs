@@ -8,6 +8,7 @@ using PutZige.Application.DTOs.Auth;
 using PutZige.Application.DTOs.Common;
 using PutZige.Application.Interfaces;
 using PutZige.Application.Common.Messages;
+using PutZige.Application.Common.Constants;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace PutZige.API.Controllers
@@ -33,7 +34,7 @@ namespace PutZige.API.Controllers
         {
             var response = await _userService.RegisterUserAsync(request.Email ?? string.Empty, request.Username ?? string.Empty, request.Password ?? string.Empty, ct);
 
-            return Created(response, SuccessMessages.Authentication.RegistrationSuccessful);
+            return Created(response, ResponseCodes.REGISTRATION_SUCCESS, SuccessMessages.Authentication.RegistrationSuccessful);
         }
     }
 }

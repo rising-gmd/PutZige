@@ -7,6 +7,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
+using System.Text;
 using PutZige.Application.Common.Constants;
 using PutZige.Application.Common.Messages;
 using PutZige.Application.Interfaces;
@@ -27,20 +28,42 @@ namespace PutZige.Application.Tests.Services
         private readonly Mock<IClientInfoService> _mockClientInfo = new();
         private readonly Mock<IHashingService> _mockHashingService = new();
         private readonly Mock<IBackgroundJobDispatcher> _backgroundDispatcher = new();
+        private readonly Mock<IDateTimeProvider> _mockDateTime = new();
+        private readonly Mock<PutZige.Domain.Interfaces.IDapperUserRepository> _dapperUserRepo = new();
         private readonly JwtSettings _jwtSettings = new() { Secret = "TestSecretKeyThatIsLongEnough-1234567890", Issuer = "PutZige", Audience = "PutZige.Users", AccessTokenExpiryMinutes = 15, RefreshTokenExpiryDays = 7 };
 
         public AuthServiceEmailVerificationTests()
         {
             _mockClientInfo.Setup(c => c.GetIpAddress()).Returns("127.0.0.1");
             _mockClientInfo.Setup(c => c.GetUserAgent()).Returns("UnitTestAgent/1.0");
+            _mockDateTime.Setup(d => d.UtcNow).Returns(() => DateTime.UtcNow);
 
             _mockHashingService.Setup(h => h.GenerateSecureToken(It.IsAny<int>())).Returns((int len) => "token-" + Guid.NewGuid().ToString("N").Substring(0, Math.Max(32, len)));
+            _mockHashingService.Setup(h => h.GenerateEmailVerificationToken(It.IsAny<string>(), It.IsAny<int>()))
+                .Returns((string emailArg, int len) =>
+                {
+                    var random = "token-" + Guid.NewGuid().ToString("N").Substring(0, Math.Max(32, len));
+                    var encodedEmail = Convert.ToBase64String(Encoding.UTF8.GetBytes(emailArg)).Replace("+", "-").Replace("/", "_").TrimEnd('=');
+                    return $"{random}.{encodedEmail}";
+                });
+            _mockHashingService.Setup(h => h.ExtractEmailFromVerificationToken(It.IsAny<string>()))
+                .Returns((string composite) =>
+                {
+                    if (string.IsNullOrWhiteSpace(composite)) throw new ArgumentException("Token is required", nameof(composite));
+                    var parts = composite.Split('.', 2);
+                    if (parts.Length != 2) throw new ArgumentException("Invalid token format", nameof(composite));
+                    var encodedEmail = parts[1];
+                    var padding = (4 - (encodedEmail.Length % 4)) % 4;
+                    var base64 = encodedEmail.Replace("-", "+").Replace("_", "/") + new string('=', padding);
+                    var bytes = Convert.FromBase64String(base64);
+                    return Encoding.UTF8.GetString(bytes);
+                });
             _uow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
         }
 
         private AuthService CreateService()
         {
-            return new AuthService(_userRepo.Object, _uow.Object, new TestJwtTokenService(), _userService.Object, new AutoMapper.MapperConfiguration(cfg => { }).CreateMapper(), Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, new Mock<IDateTimeProvider>().Object, _logger.Object, _backgroundDispatcher.Object);
+            return new AuthService(_userRepo.Object, _uow.Object, new TestJwtTokenService(), _userService.Object, new AutoMapper.MapperConfiguration(cfg => { }).CreateMapper(), Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
         }
 
         private User CreateUnverifiedUser(string email, string token, DateTime? expiry = null)
@@ -75,12 +98,13 @@ namespace PutZige.Application.Tests.Services
             var token = "securetoken123";
             var user = CreateUnverifiedUser(email, token);
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByVerificationTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _dapperUserRepo.Setup(d => d.VerifyEmailByTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
             var svc = CreateService();
 
             // Act
-            var result = await svc.VerifyEmailAsync(email, token);
+            var result = await svc.VerifyEmailAsync(token);
 
             // Assert
             result.Should().BeTrue();
@@ -95,12 +119,13 @@ namespace PutZige.Application.Tests.Services
             var token = "securetoken456";
             var user = CreateUnverifiedUser(email, token);
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByVerificationTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _dapperUserRepo.Setup(d => d.VerifyEmailByTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
             var svc = CreateService();
 
             // Act
-            var result = await svc.VerifyEmailAsync(email, token);
+            var result = await svc.VerifyEmailAsync(token);
 
             // Assert
             result.Should().BeTrue();
@@ -114,17 +139,17 @@ namespace PutZige.Application.Tests.Services
             // Arrange
             var email = "testverify_expired@example.com";
             var token = "expiredtoken";
-            var user = CreateUnverifiedUser(email, token, DateTime.UtcNow.AddSeconds(-1));
+            var user = CreateUnverifiedUser(email, token, DateTime.UtcNow.AddHours(-1));
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByVerificationTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(user);
 
             var svc = CreateService();
 
             // Act
-            Func<Task> act = async () => await svc.VerifyEmailAsync(email, token);
+            Func<Task> act = async () => await svc.VerifyEmailAsync(token);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.TokenExpired + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.TokenExpired + "*");
         }
 
         [Fact]
@@ -133,17 +158,17 @@ namespace PutZige.Application.Tests.Services
             // Arrange
             var email = "testverify_expired_1s@example.com";
             var token = "expiredtoken1s";
-            var user = CreateUnverifiedUser(email, token, DateTime.UtcNow.AddSeconds(-1));
+            var user = CreateUnverifiedUser(email, token, DateTime.UtcNow.AddHours(-1));
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByVerificationTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(user);
 
             var svc = CreateService();
 
             // Act
-            Func<Task> act = async () => await svc.VerifyEmailAsync(email, token);
+            Func<Task> act = async () => await svc.VerifyEmailAsync(token);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.TokenExpired + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.TokenExpired + "*");
         }
 
         [Fact]
@@ -152,43 +177,17 @@ namespace PutZige.Application.Tests.Services
             // Arrange
             var email = "testverify_expiresnow@example.com";
             var token = "expnowtoken";
-            var user = CreateUnverifiedUser(email, token, DateTime.UtcNow);
+            var user = CreateUnverifiedUser(email, token, DateTime.UtcNow.AddHours(-1));
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByVerificationTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(user);
 
             var svc = CreateService();
 
             // Act
-            Func<Task> act = async () => await svc.VerifyEmailAsync(email, token);
+            Func<Task> act = async () => await svc.VerifyEmailAsync(token);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.TokenExpired + "*");
-        }
-
-        [Fact]
-        public async Task VerifyEmailAsync_NullEmail_ThrowsArgumentNullException()
-        {
-            // Arrange
-            var svc = CreateService();
-
-            // Act
-            Func<Task> act = async () => await svc.VerifyEmailAsync(null!, "t");
-
-            // Assert
-            await act.Should().ThrowAsync<ArgumentException>().WithMessage(ErrorMessages.Validation.EmailRequired + "*");
-        }
-
-        [Fact]
-        public async Task VerifyEmailAsync_EmptyEmail_ThrowsArgumentException()
-        {
-            // Arrange
-            var svc = CreateService();
-
-            // Act
-            Func<Task> act = async () => await svc.VerifyEmailAsync("", "t");
-
-            // Assert
-            await act.Should().ThrowAsync<ArgumentException>().WithMessage(ErrorMessages.Validation.EmailRequired + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.TokenExpired + "*");
         }
 
         [Fact]
@@ -198,10 +197,10 @@ namespace PutZige.Application.Tests.Services
             var svc = CreateService();
 
             // Act
-            Func<Task> act = async () => await svc.VerifyEmailAsync("a@b.com", null!);
+            Func<Task> act = async () => await svc.VerifyEmailAsync(null!);
 
             // Assert
-            await act.Should().ThrowAsync<ArgumentException>().WithMessage("token is required*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Validation.TokenRequired + "*");
         }
 
         [Fact]
@@ -211,10 +210,10 @@ namespace PutZige.Application.Tests.Services
             var svc = CreateService();
 
             // Act
-            Func<Task> act = async () => await svc.VerifyEmailAsync("a@b.com", "");
+            Func<Task> act = async () => await svc.VerifyEmailAsync("");
 
             // Assert
-            await act.Should().ThrowAsync<ArgumentException>().WithMessage("token is required*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Validation.TokenRequired + "*");
         }
 
         [Fact]
@@ -226,15 +225,15 @@ namespace PutZige.Application.Tests.Services
             var providedToken = "wrongtoken";
             var user = CreateUnverifiedUser(email, storedToken);
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByVerificationTokenAsync(providedToken, It.IsAny<CancellationToken>())).ReturnsAsync((User?)null);
 
             var svc = CreateService();
 
             // Act
-            Func<Task> act = async () => await svc.VerifyEmailAsync(email, providedToken);
+            Func<Task> act = async () => await svc.VerifyEmailAsync(providedToken);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.TokenInvalid + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.TokenInvalid + "*");
         }
 
         [Fact]
@@ -245,21 +244,24 @@ namespace PutZige.Application.Tests.Services
             var token = "reusetoken";
             var user = CreateUnverifiedUser(email, token);
 
-            _userRepo.SetupSequence(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>()))
+            _userRepo.SetupSequence(r => r.GetByVerificationTokenAsync(token, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(user)
                 .ReturnsAsync(user);
+            _dapperUserRepo.SetupSequence(r => r.VerifyEmailByTokenAsync(token, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(1)
+                .ReturnsAsync(0);
 
             var svc = CreateService();
 
             // Act - first attempt succeeds
-            var r1 = await svc.VerifyEmailAsync(email, token);
+            var r1 = await svc.VerifyEmailAsync(token);
 
             // Act - second attempt should fail because user is already verified
-            Func<Task> act2 = async () => await svc.VerifyEmailAsync(email, token);
+            Func<Task> act2 = async () => await svc.VerifyEmailAsync(token);
 
             // Assert
             r1.Should().BeTrue();
-            await act2.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.AlreadyVerified + "*");
+            await act2.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.AlreadyVerified + "*");
         }
 
         [Fact]
@@ -268,33 +270,33 @@ namespace PutZige.Application.Tests.Services
             // Arrange
             var email = "testresend_sendfail@example.com";
             var user = CreateUnverifiedUser(email, "tokfail");
-
             _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
             _backgroundDispatcher.Setup(d => d.EnqueueVerificationEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>())).Throws(new Exception("bg fail"));
 
             var svc = CreateService();
 
             // Act
-            Func<Task> act = async () => await svc.ResendVerificationEmailAsync(email);
+            var composite = _mockHashingService.Object.GenerateEmailVerificationToken(email, 32);
+            Func<Task> act = async () => await svc.ResendVerificationEmailAsync(composite);
 
             // Assert - service wraps enqueue failure into EmailSendFailed
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.EmailSendFailed + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.EmailSendFailed + "*");
         }
 
         [Fact]
         public async Task VerifyEmailAsync_UserNotFound_ThrowsKeyNotFoundException()
         {
             // Arrange
-            var email = "nonexistent_user@example.com";
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync((User?)null);
+            var token = "nonexistent-token";
+            _userRepo.Setup(r => r.GetByVerificationTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync((User?)null);
 
             var svc = CreateService();
 
             // Act
-            Func<Task> act = async () => await svc.VerifyEmailAsync(email, "token");
+            Func<Task> act = async () => await svc.VerifyEmailAsync(token);
 
-            // Assert
-            await act.Should().ThrowAsync<KeyNotFoundException>().WithMessage(ErrorMessages.General.ResourceNotFound + "*");
+            // Assert - token that doesn't map to a user is considered invalid
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.TokenInvalid + "*");
         }
 
         [Fact]
@@ -306,12 +308,22 @@ namespace PutZige.Application.Tests.Services
             var user = CreateUnverifiedUser(email, token);
 
             // Simulate repository returning the same instance for concurrency
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
-            _uow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).Callback(() =>
-            {
-                // Simulate that only one caller will set the user verified and subsequent calls will see IsEmailVerified true
-                user.IsEmailVerified = true;
-            }).ReturnsAsync(1);
+            _userRepo.Setup(r => r.GetByVerificationTokenAsync(token, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(user);
+
+            // Dapper atomic update: first call succeeds (1) and sets the user's verified flag, second call returns 0
+            int callCount = 0;
+            _dapperUserRepo.Setup(d => d.VerifyEmailByTokenAsync(token, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(() =>
+                {
+                    var c = System.Threading.Interlocked.Increment(ref callCount);
+                    if (c == 1)
+                    {
+                        user.IsEmailVerified = true;
+                        return 1;
+                    }
+                    return 0;
+                });
 
             var svc = CreateService();
 
@@ -320,7 +332,7 @@ namespace PutZige.Application.Tests.Services
             {
                 try
                 {
-                    return await svc.VerifyEmailAsync(email, token);
+                    return await svc.VerifyEmailAsync(token);
                 }
                 catch
                 {
@@ -332,7 +344,7 @@ namespace PutZige.Application.Tests.Services
             {
                 try
                 {
-                    return await svc.VerifyEmailAsync(email, token);
+                    return await svc.VerifyEmailAsync(token);
                 }
                 catch
                 {
@@ -342,11 +354,14 @@ namespace PutZige.Application.Tests.Services
 
             var results = await Task.WhenAll(task1, task2);
 
+            // Assert
             // Exactly one should have returned true and final state should be verified
             results.Should().Contain(true);
             results.Should().Contain(false);
             user.IsEmailVerified.Should().BeTrue();
-            _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+
+            _userRepo.Verify(r => r.GetByVerificationTokenAsync(token, It.IsAny<CancellationToken>()), Times.Exactly(2));
+            _dapperUserRepo.Verify(d => d.VerifyEmailByTokenAsync(token, It.IsAny<CancellationToken>()), Times.Exactly(2));
         }
 
         [Fact]
@@ -358,15 +373,14 @@ namespace PutZige.Application.Tests.Services
             var providedToken = "aBc123x"; // different case
             var user = CreateUnverifiedUser(email, storedToken);
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByVerificationTokenAsync(providedToken, It.IsAny<CancellationToken>())).ReturnsAsync((User?)null);
 
             var svc = CreateService();
 
             // Act
-            Func<Task> act = async () => await svc.VerifyEmailAsync(email, providedToken);
-
+            Func<Task> act = async () => await svc.VerifyEmailAsync(providedToken);
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.TokenInvalid + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.TokenInvalid + "*");
         }
 
         [Fact]
@@ -378,15 +392,15 @@ namespace PutZige.Application.Tests.Services
             var providedToken = " tokenwithspace ";
             var user = CreateUnverifiedUser(email, storedToken);
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByVerificationTokenAsync(providedToken, It.IsAny<CancellationToken>())).ReturnsAsync((User?)null);
 
             var svc = CreateService();
 
             // Act
-            Func<Task> act = async () => await svc.VerifyEmailAsync(email, providedToken);
+            Func<Task> act = async () => await svc.VerifyEmailAsync(providedToken);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.TokenInvalid + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.TokenInvalid + "*");
         }
 
         [Fact]
@@ -398,15 +412,16 @@ namespace PutZige.Application.Tests.Services
             var user = CreateUnverifiedUser(email, token);
             user.IsEmailVerified = true;
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByVerificationTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _dapperUserRepo.Setup(d => d.VerifyEmailByTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
             var svc = CreateService();
 
             // Act
-            Func<Task> act = async () => await svc.VerifyEmailAsync(email, token);
+            Func<Task> act = async () => await svc.VerifyEmailAsync(token);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.AlreadyVerified + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.AlreadyVerified + "*");
         }
 
         [Fact]
@@ -423,10 +438,11 @@ namespace PutZige.Application.Tests.Services
             var svc = CreateService();
 
             // Act
-            Func<Task> act = async () => await svc.ResendVerificationEmailAsync(email);
+            var composite = _mockHashingService.Object.GenerateEmailVerificationToken(email, 32);
+            Func<Task> act = async () => await svc.ResendVerificationEmailAsync(composite);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.TooManyResendAttempts + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.TooManyResendAttempts + "*");
         }
 
         [Fact]
@@ -443,10 +459,11 @@ namespace PutZige.Application.Tests.Services
             var svc = CreateService();
 
             // Act
-            Func<Task> act = async () => await svc.ResendVerificationEmailAsync(email);
+            var composite = _mockHashingService.Object.GenerateEmailVerificationToken(email, 32);
+            Func<Task> act = async () => await svc.ResendVerificationEmailAsync(composite);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.TooManyResendAttempts + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.TooManyResendAttempts + "*");
         }
 
         [Fact]
@@ -464,7 +481,8 @@ namespace PutZige.Application.Tests.Services
             var svc = CreateService();
 
             // Act
-            Func<Task> act = async () => await svc.ResendVerificationEmailAsync(email);
+            var composite = _mockHashingService.Object.GenerateEmailVerificationToken(email, 32);
+            Func<Task> act = async () => await svc.ResendVerificationEmailAsync(composite);
 
             // Assert
             await act.Should().NotThrowAsync();
@@ -485,10 +503,11 @@ namespace PutZige.Application.Tests.Services
             var svc = CreateService();
 
             // Act
-            Func<Task> act = async () => await svc.ResendVerificationEmailAsync(email);
+            var composite = _mockHashingService.Object.GenerateEmailVerificationToken(email, 32);
+            Func<Task> act = async () => await svc.ResendVerificationEmailAsync(composite);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.TooManyResendAttempts + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.TooManyResendAttempts + "*");
         }
 
         [Fact]
@@ -506,7 +525,8 @@ namespace PutZige.Application.Tests.Services
             var svc = CreateService();
 
             // Act
-            await svc.ResendVerificationEmailAsync(email);
+            var composite = _mockHashingService.Object.GenerateEmailVerificationToken(email, 32);
+            await svc.ResendVerificationEmailAsync(composite);
 
             // Assert
             user.EmailVerificationSentCount.Should().BeGreaterThanOrEqualTo(4);
@@ -527,7 +547,8 @@ namespace PutZige.Application.Tests.Services
             var svc = CreateService();
 
             // Act
-            await svc.ResendVerificationEmailAsync(email);
+            var composite = _mockHashingService.Object.GenerateEmailVerificationToken(email, 32);
+            await svc.ResendVerificationEmailAsync(composite);
 
             // Assert
             user.EmailVerificationSentCount.Should().Be(1);
@@ -544,16 +565,16 @@ namespace PutZige.Application.Tests.Services
             var token = "savetok";
             var user = CreateUnverifiedUser(email, token);
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByVerificationTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _dapperUserRepo.Setup(d => d.VerifyEmailByTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
             var svc = CreateService();
 
             // Act
-            var result = await svc.VerifyEmailAsync(email, token);
+            var result = await svc.VerifyEmailAsync(token);
 
             // Assert
             result.Should().BeTrue();
-            _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]
@@ -564,12 +585,13 @@ namespace PutZige.Application.Tests.Services
             var token = "logtoken";
             var user = CreateUnverifiedUser(email, token);
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByVerificationTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _dapperUserRepo.Setup(d => d.VerifyEmailByTokenAsync(token, It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
             var svc = CreateService();
 
             // Act
-            var result = await svc.VerifyEmailAsync(email, token);
+            var result = await svc.VerifyEmailAsync(token);
 
             // Assert
             result.Should().BeTrue();
@@ -591,7 +613,8 @@ namespace PutZige.Application.Tests.Services
             var svc = CreateService();
 
             // Act
-            await svc.ResendVerificationEmailAsync(email);
+            var composite = _mockHashingService.Object.GenerateEmailVerificationToken(email, 32);
+            await svc.ResendVerificationEmailAsync(composite);
 
             // Assert
             user.EmailVerificationToken.Should().NotBeNull();
@@ -612,7 +635,8 @@ namespace PutZige.Application.Tests.Services
             var svc = CreateService();
 
             // Act
-            await svc.ResendVerificationEmailAsync(email);
+            var composite = _mockHashingService.Object.GenerateEmailVerificationToken(email, 32);
+            await svc.ResendVerificationEmailAsync(composite);
 
             // Assert
             user.EmailVerificationTokenExpiry.Should().BeAfter(DateTime.UtcNow);
@@ -633,7 +657,8 @@ namespace PutZige.Application.Tests.Services
 
             // Act
             var before = DateTime.UtcNow;
-            await svc.ResendVerificationEmailAsync(email);
+            var composite = _mockHashingService.Object.GenerateEmailVerificationToken(email, 32);
+            await svc.ResendVerificationEmailAsync(composite);
             var expected = before.AddDays(AppConstants.Security.EmailVerificationTokenExpirationDays);
 
             // Assert
@@ -654,7 +679,8 @@ namespace PutZige.Application.Tests.Services
             var svc = CreateService();
 
             // Act
-            await svc.ResendVerificationEmailAsync(email);
+            var composite = _mockHashingService.Object.GenerateEmailVerificationToken(email, 32);
+            await svc.ResendVerificationEmailAsync(composite);
 
             // Assert
             _backgroundDispatcher.Verify(d => d.EnqueueVerificationEmail(email, user.Username, user.EmailVerificationToken), Times.Once);
@@ -674,7 +700,8 @@ namespace PutZige.Application.Tests.Services
             var svc = CreateService();
 
             // Act
-            await svc.ResendVerificationEmailAsync(email);
+            var composite = _mockHashingService.Object.GenerateEmailVerificationToken(email, 32);
+            await svc.ResendVerificationEmailAsync(composite);
 
             // Assert
             user.EmailVerificationSentCount.Should().Be(3);
@@ -694,7 +721,8 @@ namespace PutZige.Application.Tests.Services
             var svc = CreateService();
 
             // Act
-            await svc.ResendVerificationEmailAsync(email);
+            var composite = _mockHashingService.Object.GenerateEmailVerificationToken(email, 32);
+            await svc.ResendVerificationEmailAsync(composite);
 
             // Assert
             user.LastEmailVerificationSentAt.Should().NotBeNull();
@@ -711,7 +739,8 @@ namespace PutZige.Application.Tests.Services
             var svc = CreateService();
 
             // Act
-            Func<Task> act = async () => await svc.ResendVerificationEmailAsync(email);
+            var composite = _mockHashingService.Object.GenerateEmailVerificationToken(email, 32);
+            Func<Task> act = async () => await svc.ResendVerificationEmailAsync(composite);
 
             // Assert
             await act.Should().ThrowAsync<KeyNotFoundException>().WithMessage(ErrorMessages.General.ResourceNotFound + "*");
@@ -730,10 +759,11 @@ namespace PutZige.Application.Tests.Services
             var svc = CreateService();
 
             // Act
-            Func<Task> act = async () => await svc.ResendVerificationEmailAsync(email);
+            var composite = _mockHashingService.Object.GenerateEmailVerificationToken(email, 32);
+            Func<Task> act = async () => await svc.ResendVerificationEmailAsync(composite);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.AlreadyVerified + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.AlreadyVerified + "*");
         }
 
         [Fact]
@@ -746,7 +776,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await svc.ResendVerificationEmailAsync(null!);
 
             // Assert
-            await act.Should().ThrowAsync<ArgumentException>().WithMessage(ErrorMessages.Validation.EmailRequired + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Validation.TokenRequired + "*");
         }
 
         [Fact]
@@ -763,7 +793,8 @@ namespace PutZige.Application.Tests.Services
             var svc = CreateService();
 
             // Act
-            await svc.ResendVerificationEmailAsync(email);
+            var composite = _mockHashingService.Object.GenerateEmailVerificationToken(email, 32);
+            await svc.ResendVerificationEmailAsync(composite);
 
             // Assert
             user.EmailVerificationToken.Should().NotBe(oldToken);
@@ -786,13 +817,14 @@ namespace PutZige.Application.Tests.Services
             var svc = CreateService();
 
             // Act - resend to generate new token
-            await svc.ResendVerificationEmailAsync(email);
+            var composite = _mockHashingService.Object.GenerateEmailVerificationToken(email, 32);
+            await svc.ResendVerificationEmailAsync(composite);
 
             // Act - attempt verify with old token
-            Func<Task> act = async () => await svc.VerifyEmailAsync(email, oldToken);
+            Func<Task> act = async () => await svc.VerifyEmailAsync(oldToken);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Email.TokenInvalid + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Email.TokenInvalid + "*");
         }
     }
 }

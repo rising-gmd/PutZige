@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -28,6 +29,8 @@ namespace PutZige.Application.Tests.Services
         private readonly Mock<IHashingService> _mockHashingService;
         private readonly UserService _sut;
         private readonly Faker _faker;
+        private readonly Mock<IDateTimeProvider> _mockDateTime;
+        private readonly DateTime _fixedNow;
         private readonly CancellationToken _ct = CancellationToken.None;
 
         public UserServiceTests()
@@ -39,7 +42,18 @@ namespace PutZige.Application.Tests.Services
             _mockHashingService = new Mock<IHashingService>();
             _faker = new Faker();
 
+            _fixedNow = DateTime.UtcNow;
+            _mockDateTime = new Mock<IDateTimeProvider>();
+            _mockDateTime.Setup(d => d.UtcNow).Returns(() => _fixedNow);
+
             _mockHashingService.Setup(h => h.GenerateSecureToken(It.IsAny<int>())).Returns(() => Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace("+","-").Replace("/","_").TrimEnd('='));
+            _mockHashingService.Setup(h => h.GenerateEmailVerificationToken(It.IsAny<string>(), It.IsAny<int>()))
+                .Returns((string emailArg, int len) =>
+                {
+                    var random = Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace("+","-").Replace("/","_").TrimEnd('=');
+                    var encodedEmail = Convert.ToBase64String(Encoding.UTF8.GetBytes(emailArg)).Replace("+","-").Replace("/","_").TrimEnd('=');
+                    return $"{random}.{encodedEmail}";
+                });
             _mockHashingService.Setup(h => h.HashAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((string s, CancellationToken ct) => new HashedValue("hash-"+s, "salt-"+s));
 
             // Initialize system under test
@@ -48,6 +62,7 @@ namespace PutZige.Application.Tests.Services
                 _mockUnitOfWork.Object,
                 _mockMapper.Object,
                 _mockHashingService.Object,
+                _mockDateTime.Object,
                 backgroundJobDispatcher: null,
                 logger: _mockLogger.Object);
         }
@@ -116,7 +131,7 @@ namespace PutZige.Application.Tests.Services
             capturedUser.Username.Should().Be(username);
             capturedUser.IsEmailVerified.Should().BeFalse();
             capturedUser.EmailVerificationToken.Should().NotBeNullOrWhiteSpace();
-            capturedUser.EmailVerificationTokenExpiry.Should().BeAfter(DateTime.UtcNow);
+            capturedUser.EmailVerificationTokenExpiry.Should().BeAfter(_fixedNow);
         }
 
         /// <summary>
@@ -199,7 +214,7 @@ namespace PutZige.Application.Tests.Services
             capturedUser.EmailVerificationToken.Should().NotEndWith("=");
 
             // Expiry approximately 7 days from now (allow small tolerance)
-            var expectedExpiry = DateTime.UtcNow.AddDays(AppConstants.Security.EmailVerificationTokenExpirationDays);
+            var expectedExpiry = _fixedNow.AddDays(AppConstants.Security.EmailVerificationTokenExpirationDays);
             capturedUser.EmailVerificationTokenExpiry.Should().BeCloseTo(expectedExpiry, precision: TimeSpan.FromSeconds(5));
         }
 
@@ -292,7 +307,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await _sut.RegisterUserAsync(email, username, password, _ct);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.EmailAlreadyTaken);
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.EmailAlreadyTaken);
 
             _mockUserRepository.Verify(x => x.IsEmailTakenAsync(email, It.IsAny<CancellationToken>()), Times.Once);
             _mockUserRepository.Verify(x => x.IsUsernameTakenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -318,7 +333,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await _sut.RegisterUserAsync(email, username, password, _ct);
 
             // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage(ErrorMessages.Authentication.UsernameAlreadyTaken);
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Authentication.UsernameAlreadyTaken);
 
             _mockUserRepository.Verify(x => x.IsEmailTakenAsync(email, It.IsAny<CancellationToken>()), Times.Once);
             _mockUserRepository.Verify(x => x.IsUsernameTakenAsync(username, It.IsAny<CancellationToken>()), Times.Once);
@@ -341,7 +356,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await _sut.RegisterUserAsync(email!, username, password, _ct);
 
             // Assert
-            await act.Should().ThrowAsync<ArgumentException>().WithMessage(ErrorMessages.Validation.EmailRequired + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Validation.EmailRequired + "*");
 
             _mockUserRepository.Verify(x => x.IsEmailTakenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         }
@@ -362,7 +377,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await _sut.RegisterUserAsync(email, username, password, _ct);
 
             // Assert
-            await act.Should().ThrowAsync<ArgumentException>().WithMessage(ErrorMessages.Validation.UsernameRequired + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Validation.UsernameRequired + "*");
 
             _mockUserRepository.Verify(x => x.IsUsernameTakenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         }
@@ -382,7 +397,7 @@ namespace PutZige.Application.Tests.Services
             Func<Task> act = async () => await _sut.RegisterUserAsync(email, username, password!, _ct);
 
             // Assert
-            await act.Should().ThrowAsync<ArgumentException>().WithMessage(ErrorMessages.Validation.PasswordRequired + "*");
+            await act.Should().ThrowAsync<PutZige.Application.Common.AppException>().WithMessage(ErrorMessages.Validation.PasswordRequired + "*");
 
             _mockUserRepository.Verify(x => x.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Never);
             _mockUnitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
@@ -405,7 +420,7 @@ namespace PutZige.Application.Tests.Services
             };
 
             var refreshToken = "refresh-token-xyz";
-            var expiry = DateTime.UtcNow.AddDays(7);
+            var expiry = _fixedNow.AddDays(7);
 
             _mockUserRepository.Setup(x => x.GetByIdAsync(userId, It.IsAny<CancellationToken>())).ReturnsAsync(user);
 
@@ -446,7 +461,7 @@ namespace PutZige.Application.Tests.Services
             };
 
             var refreshToken = "new-refresh-token";
-            var expiry = DateTime.UtcNow.AddDays(14);
+            var expiry = _fixedNow.AddDays(14);
 
             _mockUserRepository.Setup(x => x.GetByIdAsync(userId, It.IsAny<CancellationToken>())).ReturnsAsync(user);
 
@@ -456,9 +471,7 @@ namespace PutZige.Application.Tests.Services
             _mockUnitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
             // Act
-            var before = DateTime.UtcNow;
             await _sut.UpdateLoginInfoAsync(userId, "10.0.0.1", refreshToken, expiry, _ct);
-            var after = DateTime.UtcNow;
 
             // Assert
             user.Session.Should().NotBeNull();
@@ -466,7 +479,7 @@ namespace PutZige.Application.Tests.Services
             user.Session!.RefreshTokenHash.Should().Be("rt-hash");
             user.Session!.RefreshTokenSalt.Should().Be("rt-salt");
             user.Session!.IsOnline.Should().BeTrue();
-            user.Session!.LastActiveAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
+            user.Session!.LastActiveAt.Should().Be(_fixedNow);
 
             _mockUnitOfWork.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         }
@@ -498,7 +511,7 @@ namespace PutZige.Application.Tests.Services
             };
 
             var refreshToken = "another-refresh-token";
-            var expiry = DateTime.UtcNow.AddDays(30);
+            var expiry = _fixedNow.AddDays(30);
 
             _mockUserRepository.Setup(x => x.GetByIdAsync(userId, It.IsAny<CancellationToken>())).ReturnsAsync(user);
 
@@ -508,9 +521,7 @@ namespace PutZige.Application.Tests.Services
             _mockUnitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
             // Act
-            var before = DateTime.UtcNow;
             await _sut.UpdateLoginInfoAsync(userId, "192.168.0.5", refreshToken, expiry, _ct);
-            var after = DateTime.UtcNow;
 
             // Assert
             // Same instance should be updated
@@ -519,7 +530,7 @@ namespace PutZige.Application.Tests.Services
             user.Session!.RefreshTokenHash.Should().Be("new-hash");
             user.Session!.RefreshTokenSalt.Should().Be("new-salt");
             user.Session!.IsOnline.Should().BeTrue();
-            user.Session!.LastActiveAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
+            user.Session!.LastActiveAt.Should().Be(_fixedNow);
 
             _mockUnitOfWork.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         }
@@ -543,7 +554,7 @@ namespace PutZige.Application.Tests.Services
             };
 
             var refreshToken = "rt-for-reset";
-            var expiry = DateTime.UtcNow.AddDays(1);
+            var expiry = _fixedNow.AddDays(1);
             var ip = "8.8.8.8";
 
             _mockUserRepository.Setup(x => x.GetByIdAsync(userId, It.IsAny<CancellationToken>())).ReturnsAsync(user);
@@ -554,14 +565,12 @@ namespace PutZige.Application.Tests.Services
             _mockUnitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
             // Act
-            var before = DateTime.UtcNow;
             await _sut.UpdateLoginInfoAsync(userId, ip, refreshToken, expiry, _ct);
-            var after = DateTime.UtcNow;
 
             // Assert
             user.FailedLoginAttempts.Should().Be(0);
             user.LastLoginIp.Should().Be(ip);
-            user.LastLoginAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
+            user.LastLoginAt.Should().Be(_fixedNow);
 
             _mockUnitOfWork.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         }

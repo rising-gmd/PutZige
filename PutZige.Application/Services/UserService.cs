@@ -8,6 +8,7 @@ using PutZige.Domain.Entities;
 using PutZige.Domain.Interfaces;
 using System.Security.Cryptography;
 using PutZige.Application.Common.Constants;
+using PutZige.Application.Common;
 using PutZige.Application.Common.Messages;
 using Microsoft.Extensions.Logging;
 using AutoMapper;
@@ -44,20 +45,14 @@ namespace PutZige.Application.Services
             _dateTimeProvider = dateTimeProvider;
         }
 
-        // Backwards-compatible overload for tests/consumers that don't provide IDateTimeProvider yet
-        public UserService(IUserRepository userRepository, IUnitOfWork unitOfWork, IMapper mapper, IHashingService hashingService, PutZige.Application.Interfaces.IBackgroundJobDispatcher? backgroundJobDispatcher = null, ILogger<UserService>? logger = null)
-            : this(userRepository, unitOfWork, mapper, hashingService, new PutZige.Application.Services.SystemDateTimeProvider(), backgroundJobDispatcher, logger)
-        {
-        }
-
         /// <summary>
         /// Registers a new user with validation and hashing and returns a response DTO.
         /// </summary>
         public async Task<RegisterUserResponse> RegisterUserAsync(string email, string username, string password, CancellationToken ct = default)
         {
-            if (string.IsNullOrWhiteSpace(email)) throw new ArgumentException(ErrorMessages.Validation.EmailRequired, nameof(email));
-            if (string.IsNullOrWhiteSpace(username)) throw new ArgumentException(ErrorMessages.Validation.UsernameRequired, nameof(username));
-            if (string.IsNullOrWhiteSpace(password)) throw new ArgumentException(ErrorMessages.Validation.PasswordRequired, nameof(password));
+            if (string.IsNullOrWhiteSpace(email)) throw new AppException(ResponseCodes.EMAIL_REQUIRED, ErrorMessages.Validation.EmailRequired);
+            if (string.IsNullOrWhiteSpace(username)) throw new AppException(ResponseCodes.USERNAME_REQUIRED, ErrorMessages.Validation.UsernameRequired);
+            if (string.IsNullOrWhiteSpace(password)) throw new AppException(ResponseCodes.PASSWORD_REQUIRED, ErrorMessages.Validation.PasswordRequired);
 
             _logger?.LogInformation("User registration attempt - Email: {Email}", email);
 
@@ -65,17 +60,17 @@ namespace PutZige.Application.Services
             if (await _userRepository.IsEmailTakenAsync(email, ct))
             {
                 _logger?.LogWarning("Registration failed - Email already exists: {Email}", email);
-                throw new InvalidOperationException(ErrorMessages.Authentication.EmailAlreadyTaken);
+                throw new AppException(ResponseCodes.EMAIL_ALREADY_EXISTS, ErrorMessages.Authentication.EmailAlreadyTaken);
             }
 
             if (await _userRepository.IsUsernameTakenAsync(username, ct))
             {
                 _logger?.LogWarning("Registration failed - Username already exists: {Username}", username);
-                throw new InvalidOperationException(ErrorMessages.Authentication.UsernameAlreadyTaken);
+                throw new AppException(ResponseCodes.USERNAME_TAKEN, ErrorMessages.Authentication.UsernameAlreadyTaken);
             }
 
-            // Create a cryptographically secure verification token
-            var token = _hashingService.GenerateSecureToken(32);
+            // Create a cryptographically secure composite verification token that embeds email
+            var token = _hashingService.GenerateEmailVerificationToken(email, 32);
 
             // Hash password
             var hashed = await _hashingService.HashAsync(password, ct);

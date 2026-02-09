@@ -50,8 +50,8 @@ namespace PutZige.Infrastructure.Tests.Services
             await File.WriteAllTextAsync(path, "<a href='{{VerificationLink}}'>verify</a>");
 
             // Act
-            var method = typeof(EmailService).GetMethod("BuildVerificationHtmlAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
-            var taskObj = method.Invoke(svc, new object[] { username, token, CancellationToken.None })!;
+            var method = typeof(EmailService).GetMethod("BuildVerificationHtmlAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new Type[] { typeof(string), typeof(string), typeof(string), typeof(System.Threading.CancellationToken) }, null)!;
+            var taskObj = method.Invoke(svc, new object[] { username, token, email, CancellationToken.None })!;
             var htmlTask = (Task<string>)taskObj;
             var result = await htmlTask;
 
@@ -72,8 +72,8 @@ namespace PutZige.Infrastructure.Tests.Services
             var token = "toktest";
 
             // Act
-            var htmlTask = (Task<string>)typeof(EmailService).GetMethod("BuildVerificationHtmlAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
-                .Invoke(svc, new object[] { username, token, CancellationToken.None })!;
+            var htmlTask = (Task<string>)typeof(EmailService).GetMethod("BuildVerificationHtmlAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new Type[] { typeof(string), typeof(string), typeof(string), typeof(System.Threading.CancellationToken) }, null)!
+                .Invoke(svc, new object[] { username, token, email, CancellationToken.None })!;
 
             var html = await htmlTask;
 
@@ -93,8 +93,8 @@ namespace PutZige.Infrastructure.Tests.Services
             var path = Path.Combine(dir, "VerificationEmail.html");
             await File.WriteAllTextAsync(path, "Hello {{Username}}, click {{VerificationLink}} - expires in {{ExpiryHours}} hours");
 
-            var method = typeof(EmailService).GetMethod("BuildVerificationHtmlAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
-            var html = await (Task<string>)method.Invoke(svc, new object[] { "Alice", "tok", CancellationToken.None })!;
+            var method = typeof(EmailService).GetMethod("BuildVerificationHtmlAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new Type[] { typeof(string), typeof(string), typeof(string), typeof(System.Threading.CancellationToken) }, null)!;
+            var html = await (Task<string>)method.Invoke(svc, new object[] { "Alice", "tok", "alice@example.com", CancellationToken.None })!;
 
             html.Should().Contain("Hello Alice");
             File.Delete(path);
@@ -109,8 +109,8 @@ namespace PutZige.Infrastructure.Tests.Services
             var path = Path.Combine(dir, "VerificationEmail.html");
             await File.WriteAllTextAsync(path, "Link: {{VerificationLink}}");
 
-            var method = typeof(EmailService).GetMethod("BuildVerificationHtmlAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
-            var html = await (Task<string>)method.Invoke(svc, new object[] { "Bob", "tok123", CancellationToken.None })!;
+            var method = typeof(EmailService).GetMethod("BuildVerificationHtmlAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new Type[] { typeof(string), typeof(string), typeof(string), typeof(System.Threading.CancellationToken) }, null)!;
+            var html = await (Task<string>)method.Invoke(svc, new object[] { "Bob", "tok123", "bob@example.com", CancellationToken.None })!;
 
             // verification link should contain base url
             html.Should().Contain("https://example.com/");
@@ -126,8 +126,8 @@ namespace PutZige.Infrastructure.Tests.Services
             var path = Path.Combine(dir, "VerificationEmail.html");
             await File.WriteAllTextAsync(path, "Expires in {{ExpiryHours}} hours");
 
-            var method = typeof(EmailService).GetMethod("BuildVerificationHtmlAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
-            var html = await (Task<string>)method.Invoke(svc, new object[] { "Carol", "tokX", CancellationToken.None })!;
+            var method = typeof(EmailService).GetMethod("BuildVerificationHtmlAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new Type[] { typeof(string), typeof(string), typeof(string), typeof(System.Threading.CancellationToken) }, null)!;
+            var html = await (Task<string>)method.Invoke(svc, new object[] { "Carol", "tokX", "carol@example.com", CancellationToken.None })!;
 
             html.Should().Contain("Expires in");
             // default implementation sets expiryHours to 24
@@ -142,8 +142,8 @@ namespace PutZige.Infrastructure.Tests.Services
             var dir = Path.Combine(AppContext.BaseDirectory, "Templates");
             if (Directory.Exists(dir)) Directory.Delete(dir, true);
 
-            var method = typeof(EmailService).GetMethod("BuildVerificationHtmlAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
-            var html = await (Task<string>)method.Invoke(svc, new object[] { "Dan", "tokY", CancellationToken.None })!;
+            var method = typeof(EmailService).GetMethod("BuildVerificationHtmlAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new Type[] { typeof(string), typeof(string), typeof(string), typeof(System.Threading.CancellationToken) }, null)!;
+            var html = await (Task<string>)method.Invoke(svc, new object[] { "Dan", "tokY", "dan@example.com", CancellationToken.None })!;
 
             (html.Contains("Please verify") || html.Contains("link")).Should().BeTrue();
         }
@@ -157,8 +157,8 @@ namespace PutZige.Infrastructure.Tests.Services
             var path = Path.Combine(dir, "VerificationEmail.html");
             await File.WriteAllTextAsync(path, "Hello {{Username - missing brace {{VerificationLink}");
 
-            var method = typeof(EmailService).GetMethod("BuildVerificationHtmlAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
-            var html = await (Task<string>)method.Invoke(svc, new object[] { "Eve", "tokZ", CancellationToken.None })!;
+            var method = typeof(EmailService).GetMethod("BuildVerificationHtmlAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new Type[] { typeof(string), typeof(string), typeof(string), typeof(System.Threading.CancellationToken) }, null)!;
+            var html = await (Task<string>)method.Invoke(svc, new object[] { "Eve", "tokZ", "eve@example.com", CancellationToken.None })!;
 
             // should not throw and should return some content
             html.Should().NotBeNullOrWhiteSpace();
@@ -193,9 +193,9 @@ namespace PutZige.Infrastructure.Tests.Services
         public async Task BuildVerificationHtmlAsync_DoesNotIncludeRawToken()
         {
             var svc = new EmailService(_opts.Object, _logger.Object);
-            var method = typeof(EmailService).GetMethod("BuildVerificationHtmlAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+            var method = typeof(EmailService).GetMethod("BuildVerificationHtmlAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new Type[] { typeof(string), typeof(string), typeof(string), typeof(System.Threading.CancellationToken) }, null)!;
             var token = "sensitive-token-123";
-            var html = await (Task<string>)method.Invoke(svc, new object[] { "Frank", token, CancellationToken.None })!;
+            var html = await (Task<string>)method.Invoke(svc, new object[] { "Frank", token, "frank@example.com", CancellationToken.None })!;
             html.Should().NotContain(token);
             var b64raw = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(token));
             var b64escaped = Uri.EscapeDataString(b64raw);
@@ -211,8 +211,8 @@ namespace PutZige.Infrastructure.Tests.Services
             var path = Path.Combine(dir, "VerificationEmail.html");
             await File.WriteAllTextAsync(path, "Expiry: {{ExpiryHours}}");
 
-            var method = typeof(EmailService).GetMethod("BuildVerificationHtmlAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
-            var html = await (Task<string>)method.Invoke(svc, new object[] { "Gina", "t", CancellationToken.None })!;
+            var method = typeof(EmailService).GetMethod("BuildVerificationHtmlAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new Type[] { typeof(string), typeof(string), typeof(string), typeof(System.Threading.CancellationToken) }, null)!;
+            var html = await (Task<string>)method.Invoke(svc, new object[] { "Gina", "t", "gina@example.com", CancellationToken.None })!;
 
             // Expect integer number in output
             var digits = System.Text.RegularExpressions.Regex.Match(html, "\\d+");
@@ -224,9 +224,9 @@ namespace PutZige.Infrastructure.Tests.Services
         public async Task BuildVerificationHtmlAsync_CompletesWithin5Seconds_Success()
         {
             var svc = new EmailService(_opts.Object, _logger.Object);
-            var method = typeof(EmailService).GetMethod("BuildVerificationHtmlAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+            var method = typeof(EmailService).GetMethod("BuildVerificationHtmlAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new Type[] { typeof(string), typeof(string), typeof(string), typeof(System.Threading.CancellationToken) }, null)!;
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            var task = (Task<string>)method.Invoke(svc, new object[] { "Henry", "tokenfast", cts.Token })!;
+            var task = (Task<string>)method.Invoke(svc, new object[] { "Henry", "tokenfast", "henry@example.com", cts.Token })!;
             var completed = await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(5), CancellationToken.None));
             completed.Should().Be(task);
         }

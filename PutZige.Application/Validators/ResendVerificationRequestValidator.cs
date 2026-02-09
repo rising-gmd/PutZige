@@ -7,8 +7,7 @@ public sealed class ResendVerificationRequestValidator : AbstractValidator<Resen
 {
     public ResendVerificationRequestValidator()
         {
-            RuleFor(x => x.Email)
-                .NotEmpty().WithName("email").WithMessage(PutZige.Application.Common.Messages.ErrorMessages.Validation.EmailRequired)
-                .EmailAddress().WithMessage(PutZige.Application.Common.Messages.ErrorMessages.Validation.EmailInvalidFormat);
+            RuleFor(x => x.Token)
+                .NotEmpty().WithName("token").WithMessage(PutZige.Application.Common.Messages.ErrorMessages.Validation.TokenRequired);
         }
 }
