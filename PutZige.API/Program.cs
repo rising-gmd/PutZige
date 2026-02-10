@@ -29,6 +29,7 @@ try
     builder.Services.AddApiConfiguration();
     builder.Services.AddSwaggerConfiguration();
     builder.Services.AddAuthenticationConfiguration(builder.Configuration);
+    builder.Services.AddCookieAuthenticationConfiguration(builder.Configuration);
     builder.Services.AddCorsConfiguration(builder.Configuration, builder.Environment);
     builder.Services.AddApplicationServices();
     builder.Services.AddInfrastructureServices(builder.Configuration, builder.Environment, hangfireEnabled: true);

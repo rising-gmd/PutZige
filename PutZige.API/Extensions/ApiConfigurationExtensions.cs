@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Builder;
 using FluentValidation.AspNetCore;
 using PutZige.API.Filters;
 using Microsoft.Extensions.Logging;
+using PutZige.Application.Interfaces;
+using PutZige.API.RealTime;
 
 namespace PutZige.API.Extensions
 {
@@ -30,6 +32,9 @@ namespace PutZige.API.Extensions
 
                 services.AddFluentValidationAutoValidation();
                 services.AddFluentValidationClientsideAdapters();
+
+                // Register real-time notifier (SignalR implementation)
+                services.AddScoped<IRealTimeNotifier, SignalRNotifier>();
 
                 var logger = services.BuildServiceProvider().GetService<ILoggerFactory>()?.CreateLogger("ApiConfiguration");
                 logger?.LogInformation("Controllers and FluentValidation configured");

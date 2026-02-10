@@ -58,6 +58,21 @@ namespace PutZige.Application.Services
             _backgroundJobDispatcher = backgroundJobDispatcher ?? new NoOpBackgroundJobDispatcher();
         }
 
+        public async Task LogoutAsync(Guid userId, CancellationToken ct = default)
+        {
+            var user = await _userRepository.GetByIdAsync(userId, ct);
+            if (user?.Session == null) return;
+
+            user.Session.RefreshTokenHash = null;
+            user.Session.RefreshTokenSalt = null;
+            user.Session.RefreshTokenExpiry = null;
+            user.Session.IsOnline = false;
+
+            await _unitOfWork.SaveChangesAsync(ct);
+
+            _logger?.LogInformation("User logged out - UserId: {UserId}", userId);
+        }
+
         public async Task<bool> VerifyEmailAsync(string token, CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(token))
@@ -78,6 +93,8 @@ namespace PutZige.Application.Services
             if (!user.EmailVerificationTokenExpiry.HasValue || user.EmailVerificationTokenExpiry.Value <= _dateTimeProvider.UtcNow)
                 throw new AppException(ResponseCodes.TOKEN_EXPIRED, ErrorMessages.Email.TokenExpired);
 
+            // Attempt atomic DB update so concurrent requests both hit the DB. Use the returned row count
+            // to determine whether this request performed the verification.
             int rows = await _dapperUserRepository.VerifyEmailByTokenAsync(actualToken, ct).ConfigureAwait(false);
 
             if (rows == 0)

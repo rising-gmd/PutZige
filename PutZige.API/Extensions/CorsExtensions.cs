@@ -94,6 +94,8 @@ namespace PutZige.API.Extensions
                         {
                             // AllowCredentials requires explicit origins (cannot be used with AllowAnyOrigin)
                             builder.AllowCredentials();
+                            // Expose Set-Cookie so browsers can access cookie headers when AllowCredentials is true
+                            builder.WithExposedHeaders("Set-Cookie");
                         }
 
                         // Preflight caching for performance

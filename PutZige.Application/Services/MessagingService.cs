@@ -22,8 +22,9 @@ public class MessagingService : IMessagingService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
     private readonly ILogger<MessagingService>? _logger;
+    private readonly PutZige.Application.Interfaces.IRealTimeNotifier _realTimeNotifier;
 
-    public MessagingService(IMessageRepository messageRepository, IUserRepository userRepository, IUnitOfWork unitOfWork, IMapper mapper, ILogger<MessagingService>? logger = null)
+    public MessagingService(IMessageRepository messageRepository, IUserRepository userRepository, IUnitOfWork unitOfWork, IMapper mapper, PutZige.Application.Interfaces.IRealTimeNotifier realTimeNotifier, ILogger<MessagingService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(messageRepository);
         ArgumentNullException.ThrowIfNull(userRepository);
@@ -34,6 +35,7 @@ public class MessagingService : IMessagingService
         _userRepository = userRepository;
         _unitOfWork = unitOfWork;
         _mapper = mapper;
+        _realTimeNotifier = realTimeNotifier ?? throw new ArgumentNullException(nameof(realTimeNotifier));
         _logger = logger;
     }
 
@@ -112,6 +114,9 @@ public class MessagingService : IMessagingService
         await _unitOfWork.SaveChangesAsync(ct);
 
         _logger?.LogInformation("Message delivered - MessageId: {MessageId}", messageId);
+
+        // Notify sender via real-time notifier
+        await _realTimeNotifier.TryNotifyMessageDeliveredAsync(message.SenderId, messageId, message.DeliveredAt ?? DateTime.UtcNow);
     }
 
     public async Task MarkMessageAsReadAsync(Guid messageId, CancellationToken ct = default)
@@ -126,5 +131,7 @@ public class MessagingService : IMessagingService
         await _unitOfWork.SaveChangesAsync(ct);
 
         _logger?.LogInformation("Message read - MessageId: {MessageId}", messageId);
+
+        await _realTimeNotifier.TryNotifyMessageReadAsync(message.SenderId, messageId, message.ReadAt ?? DateTime.UtcNow);
     }
 }

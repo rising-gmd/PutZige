@@ -64,6 +64,13 @@ namespace PutZige.API.Extensions
                             if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments(PutZige.Application.Common.Constants.SignalRConstants.HubRoute))
                             {
                                 context.Token = accessToken;
+                                return System.Threading.Tasks.Task.CompletedTask;
+                            }
+
+                        // Fall back to accessToken cookie for regular HTTP API calls
+                            if (context.Request.Cookies.TryGetValue(PutZige.Application.Common.Constants.CookieConstants.ACCESS_TOKEN, out var cookieToken) && !string.IsNullOrWhiteSpace(cookieToken))
+                            {
+                                context.Token = cookieToken;
                             }
 
                             return System.Threading.Tasks.Task.CompletedTask;

@@ -25,7 +25,7 @@ namespace PutZige.Infrastructure.Services
             _keyBytes = Encoding.UTF8.GetBytes(_settings.Secret);
         }
 
-        public string GenerateAccessToken(Guid userId, string email, string username, int expiryMinutes, out DateTime expiresAt)
+        public string GenerateAccessToken(Guid userId, string email, string username, double expiryMinutes, out DateTime expiresAt)
         {
             expiresAt = DateTime.UtcNow.AddMinutes(expiryMinutes);
 

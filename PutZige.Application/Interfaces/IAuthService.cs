@@ -9,6 +9,7 @@ namespace PutZige.Application.Interfaces
     {
         Task<LoginResponse> LoginAsync(string identifier, string password, CancellationToken ct = default);
         Task<RefreshTokenResponse> RefreshTokenAsync(string refreshToken, CancellationToken ct = default);
+        Task LogoutAsync(System.Guid userId, CancellationToken ct = default);
         Task<bool> VerifyEmailAsync(string token, CancellationToken ct = default);
         Task ResendVerificationEmailAsync(string token, CancellationToken ct = default);
     }

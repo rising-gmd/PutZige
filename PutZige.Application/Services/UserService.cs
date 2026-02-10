@@ -31,7 +31,7 @@ namespace PutZige.Application.Services
         private readonly PutZige.Application.Interfaces.ICurrentUserService _currentUserService;
         private readonly PutZige.Domain.Interfaces.IDapperUserRepository? _dapperUserRepository;
 
-        public UserService(IUserRepository userRepository, IUnitOfWork unitOfWork, IMapper mapper, IHashingService hashingService, IDateTimeProvider dateTimeProvider, PutZige.Application.Interfaces.ICurrentUserService currentUserService, PutZige.Domain.Interfaces.IDapperUserRepository? dapperUserRepository = null, PutZige.Application.Interfaces.IBackgroundJobDispatcher? backgroundJobDispatcher = null, ILogger<UserService>? logger = null)
+        public UserService(IUserRepository userRepository, IUnitOfWork unitOfWork, IMapper mapper, IHashingService hashingService, IDateTimeProvider dateTimeProvider, PutZige.Application.Interfaces.ICurrentUserService? currentUserService = null, PutZige.Domain.Interfaces.IDapperUserRepository? dapperUserRepository = null, PutZige.Application.Interfaces.IBackgroundJobDispatcher? backgroundJobDispatcher = null, ILogger<UserService>? logger = null)
         {
             ArgumentNullException.ThrowIfNull(userRepository);
             ArgumentNullException.ThrowIfNull(unitOfWork);
@@ -46,8 +46,18 @@ namespace PutZige.Application.Services
             _hashingService = hashingService;
             _backgroundJobDispatcher = backgroundJobDispatcher ?? new NoOpBackgroundJobDispatcher();
             _dateTimeProvider = dateTimeProvider;
-            _currentUserService = currentUserService ?? throw new ArgumentNullException(nameof(currentUserService));
+            _currentUserService = currentUserService ?? new NoOpCurrentUserService();
             _dapperUserRepository = dapperUserRepository;
+        }
+
+        // Minimal internal no-op implementation for tests or contexts without HTTP context.
+        private sealed class NoOpCurrentUserService : PutZige.Application.Interfaces.ICurrentUserService
+        {
+            public Guid GetUserId() => Guid.Empty;
+            public Guid? TryGetUserId() => null;
+            public string? GetUserEmail() => null;
+            public string? GetUserName() => null;
+            public bool IsAuthenticated() => false;
         }
 
         /// <summary>

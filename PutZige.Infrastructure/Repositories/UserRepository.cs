@@ -61,6 +61,12 @@ public class UserRepository : Repository<User>, IUserRepository
         return await _dbSet.Include(u => u.Session).FirstOrDefaultAsync(u => u.Email == email, ct).ConfigureAwait(false);
     }
 
+    public async Task<User?> GetByIdWithSessionAsync(Guid id, CancellationToken ct = default)
+    {
+        if (id == Guid.Empty) return null;
+        return await _dbSet.Include(u => u.Session).FirstOrDefaultAsync(u => u.Id == id, ct).ConfigureAwait(false);
+    }
+
     /// <inheritdoc/>
     public async Task<User?> GetByUsernameWithSessionAsync(string username, CancellationToken ct = default)
     {

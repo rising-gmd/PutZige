@@ -5,7 +5,7 @@ namespace PutZige.Application.Tests
 {
     internal class TestJwtTokenService : IJwtTokenService
     {
-        public string GenerateAccessToken(Guid userId, string email, string username, int expiryMinutes, out DateTime expiresAt)
+        public string GenerateAccessToken(Guid userId, string email, string username, double expiryMinutes, out DateTime expiresAt)
         {
             expiresAt = DateTime.UtcNow.AddMinutes(expiryMinutes);
             return "access-token-test";

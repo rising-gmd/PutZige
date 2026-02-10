@@ -20,6 +20,9 @@ namespace PutZige.Application.Common.Constants
 
         // Email verification
         public const string EMAIL_ALREADY_VERIFIED = "EMAIL_ALREADY_VERIFIED";
+        public const string LOGOUT_SUCCESS = "AUTH_LOGOUT_SUCCESS";
+        public const string NEGOTIATE_SUCCESS = "SIGNALR_NEGOTIATE_SUCCESS";
+        public const string TOKEN_REFRESHED = "AUTH_TOKEN_REFRESHED";
         public const string TOO_MANY_RESEND_ATTEMPTS = "TOO_MANY_RESEND_ATTEMPTS";
 
         // General

@@ -41,6 +41,11 @@ namespace PutZige.Domain.Interfaces
         Task<User?> GetByUsernameWithSessionAsync(string username, CancellationToken ct = default);
 
         /// <summary>
+        /// Gets a user by id including the session navigation property.
+        /// </summary>
+        Task<User?> GetByIdWithSessionAsync(Guid id, CancellationToken ct = default);
+
+        /// <summary>
         /// Gets a user by refresh token via session.
         /// </summary>
         Task<User?> GetByRefreshTokenAsync(string refreshToken, CancellationToken ct = default);

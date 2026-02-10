@@ -134,7 +134,7 @@ namespace PutZige.Application.Tests.Services
             var pwd = "Password1!";
 
             var mockLogger = new Mock<ILogger<UserService>>();
-            var svc = new UserService(_userRepo.Object, _uow.Object, _mapper.Object, _hashing.Object, _mockDateTime.Object, _bg.Object, mockLogger.Object);
+            var svc = new UserService(_userRepo.Object, _uow.Object, _mapper.Object, _hashing.Object, _mockDateTime.Object, currentUserService: null, dapperUserRepository: null, backgroundJobDispatcher: _bg.Object, logger: mockLogger.Object);
 
             _userRepo.Setup(r => r.IsEmailTakenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
             _userRepo.Setup(r => r.IsUsernameTakenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
@@ -156,7 +156,8 @@ namespace PutZige.Application.Tests.Services
 
         private UserService CreateSvc()
         {
-            return new UserService(_userRepo.Object, _uow.Object, _mapper.Object, _hashing.Object, _mockDateTime.Object, _bg.Object, _logger.Object);
+            // Correct parameter order: userRepository, unitOfWork, mapper, hashingService, dateTimeProvider, currentUserService, dapperUserRepository, backgroundJobDispatcher, logger
+            return new UserService(_userRepo.Object, _uow.Object, _mapper.Object, _hashing.Object, _mockDateTime.Object, currentUserService: null, dapperUserRepository: null, backgroundJobDispatcher: _bg.Object, logger: _logger.Object);
         }
 
         [Fact]

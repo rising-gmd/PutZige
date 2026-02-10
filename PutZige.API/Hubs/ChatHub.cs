@@ -45,11 +45,14 @@ public class ChatHub : Hub
 
             _logger?.LogInformation("User connected - UserId: {UserId}, ConnectionId: {ConnectionId}", userId, Context.ConnectionId);
 
+            // Broadcast user online status
+            await Clients.All.SendAsync("UserOnline", new { UserId = userId, IsOnline = true, LastSeen = DateTime.UtcNow });
+
             await base.OnConnectedAsync();
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Failed to establish connection - ConnectionId: {ConnectionId}", Context.ConnectionId);
+            _logger?.LogError(ex, "Failed to establish connection - ConnectionId: {ConnectionId}", Context.ConnectionId); // Log error on connection failure
             Context.Abort();
         }
     }
@@ -65,6 +68,8 @@ public class ChatHub : Hub
                 _connectionMapping.Remove(userId.Value);
 
                 _logger?.LogInformation("User disconnected - UserId: {UserId}, ConnectionId: {ConnectionId}", userId.Value, Context.ConnectionId);
+
+                await Clients.All.SendAsync("UserOffline", new { UserId = userId.Value, IsOnline = false, LastSeen = DateTime.UtcNow });
             }
 
         }
@@ -119,6 +124,42 @@ public class ChatHub : Hub
             _logger?.LogError(ex, "Failed to send message - ConnectionId: {ConnectionId}", Context.ConnectionId);
             throw;
         }
+    }
+
+    public async Task StartTyping(Guid conversationId)
+    {
+        var userId = GetCurrentUserId();
+        await Clients.Others.SendAsync("UserTyping", new { UserId = userId, ConversationId = conversationId });
+    }
+
+    public async Task StopTyping(Guid conversationId)
+    {
+        var userId = GetCurrentUserId();
+        await Clients.Others.SendAsync("UserStoppedTyping", new { UserId = userId, ConversationId = conversationId });
+    }
+
+    public async Task NotifyMessageDelivered(Guid messageId, Guid receiverId, DateTime deliveredAt)
+    {
+        if (_connectionMapping.TryGetConnection(receiverId, out var connectionId))
+        {
+            await Clients.Client(connectionId).SendAsync("MessageDelivered", new { MessageId = messageId, DeliveredAt = deliveredAt });
+        }
+    }
+
+    public async Task NotifyMessageRead(Guid messageId, Guid senderId, DateTime readAt)
+    {
+        if (_connectionMapping.TryGetConnection(senderId, out var connectionId))
+        {
+            await Clients.Client(connectionId).SendAsync("MessageRead", new { MessageId = messageId, ReadAt = readAt });
+        }
+    }
+
+    private Guid GetCurrentUserId()
+    {
+        var sub = Context.User?.FindFirst("sub")?.Value ?? Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!Guid.TryParse(sub, out var userId))
+            throw new HubException("Unauthorized");
+        return userId;
     }
 
 }

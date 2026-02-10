@@ -23,6 +23,7 @@ public partial class MessagingServiceTests
     private readonly Mock<IUnitOfWork> _mockUow;
     private readonly Mock<IMapper> _mockMapper;
     private readonly Mock<ILogger<MessagingService>> _mockLogger;
+    private readonly Mock<PutZige.Application.Interfaces.IRealTimeNotifier> _mockRealTimeNotifier;
     private readonly MessagingService _sut;
     private readonly CancellationToken _ct = CancellationToken.None;
 
@@ -33,6 +34,7 @@ public partial class MessagingServiceTests
         _mockUow = new Mock<IUnitOfWork>();
         _mockMapper = new Mock<IMapper>();
         _mockLogger = new Mock<ILogger<MessagingService>>();
+        _mockRealTimeNotifier = new Mock<PutZige.Application.Interfaces.IRealTimeNotifier>();
 
         // Default mapper behaviors used across tests
         _mockMapper.Setup(m => m.Map<SendMessageResponse>(It.IsAny<Message>())).Returns((Message msg) => new SendMessageResponse(msg.Id, msg.SenderId, msg.ReceiverId, msg.MessageText, msg.SentAt));
@@ -43,7 +45,7 @@ public partial class MessagingServiceTests
         // Also setup the overload that accepts include expressions to avoid Moq overload resolution mismatches
         _mockUserRepo.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>(), It.IsAny<System.Linq.Expressions.Expression<Func<Domain.Entities.User, object>>[]>())).ReturnsAsync((Guid id, CancellationToken _, System.Linq.Expressions.Expression<Func<Domain.Entities.User, object>>[] __) => new Domain.Entities.User { Id = id });
 
-        _sut = new MessagingService(_mockMessageRepo.Object, _mockUserRepo.Object, _mockUow.Object, _mockMapper.Object, _mockLogger.Object);
+        _sut = new MessagingService(_mockMessageRepo.Object, _mockUserRepo.Object, _mockUow.Object, _mockMapper.Object, _mockRealTimeNotifier.Object, _mockLogger.Object);
     }
 
     // Helper to create a message entity
