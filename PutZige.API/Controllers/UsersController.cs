@@ -8,6 +8,7 @@ using PutZige.Application.DTOs.Auth;
 using PutZige.Application.DTOs.Common;
 using PutZige.Application.Interfaces;
 using PutZige.Application.Common.Messages;
+using System.Linq;
 using PutZige.Application.Common.Constants;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
@@ -50,6 +51,31 @@ namespace PutZige.API.Controllers
             var profile = await _userService.GetMyProfileAsync(ct);
 
             return Success(profile, ResponseCodes.PROFILE_RETRIEVED_SUCCESSFULLY, SuccessMessages.UserProfile.ProfileRetrieved);
+        }
+
+        [HttpGet("search")]
+        public async Task<ActionResult<ApiResponse<object>>> Search([FromQuery] string query, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(query) || query.Length < 1)
+            {
+                return BadRequestError<object>(ResponseCodes.VALIDATION_FAILED, "Query parameter is required and must be at least 1 character");
+            }
+
+            var results = await _userService.SearchUsersAsync(query, ct).ConfigureAwait(false);
+
+            var users = results.Select(u => new
+            {
+                id = u.Id,
+                username = u.Username,
+                displayName = u.DisplayName,
+                email = u.Email,
+                jobTitle = u.JobTitle,
+                bio = u.Bio,
+                profilePictureUrl = u.ProfilePictureUrl
+            }).ToArray();
+            var response = (object)new { users, totalCount = users.Length };
+
+            return Success(response, ResponseCodes.USERS_FOUND);
         }
     }
 }

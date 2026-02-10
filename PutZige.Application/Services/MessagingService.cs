@@ -17,6 +17,7 @@ namespace PutZige.Application.Services;
 
 public class MessagingService : IMessagingService
 {
+        private readonly PutZige.Domain.Interfaces.IDapperMessageRepository? _dapperMessageRepository;
     private readonly IMessageRepository _messageRepository;
     private readonly IUserRepository _userRepository;
     private readonly IUnitOfWork _unitOfWork;
@@ -24,7 +25,7 @@ public class MessagingService : IMessagingService
     private readonly ILogger<MessagingService>? _logger;
     private readonly PutZige.Application.Interfaces.IRealTimeNotifier _realTimeNotifier;
 
-    public MessagingService(IMessageRepository messageRepository, IUserRepository userRepository, IUnitOfWork unitOfWork, IMapper mapper, PutZige.Application.Interfaces.IRealTimeNotifier realTimeNotifier, ILogger<MessagingService>? logger = null)
+    public MessagingService(IMessageRepository messageRepository, IUserRepository userRepository, IUnitOfWork unitOfWork, IMapper mapper, PutZige.Application.Interfaces.IRealTimeNotifier realTimeNotifier, ILogger<MessagingService>? logger = null, PutZige.Domain.Interfaces.IDapperMessageRepository? dapperMessageRepository = null)
     {
         ArgumentNullException.ThrowIfNull(messageRepository);
         ArgumentNullException.ThrowIfNull(userRepository);
@@ -37,7 +38,44 @@ public class MessagingService : IMessagingService
         _mapper = mapper;
         _realTimeNotifier = realTimeNotifier ?? throw new ArgumentNullException(nameof(realTimeNotifier));
         _logger = logger;
-    }
+            _dapperMessageRepository = dapperMessageRepository;
+            _logger = logger;
+        }
+
+        public async Task<ConversationListResponse> GetConversationsAsync(Guid userId, CancellationToken ct = default)
+        {
+            if (userId == Guid.Empty) throw new AppException(ResponseCodes.SENDER_ID_REQUIRED, ErrorMessages.Messaging.SenderIdRequired);
+
+            if (_dapperMessageRepository == null)
+            {
+                return new ConversationListResponse { Conversations = new(), TotalCount = 0 };
+            }
+
+            var projections = await _dapperMessageRepository.GetConversationsForUserAsync(userId, 100, ct).ConfigureAwait(false);
+
+            var convs = projections.Select(p => new ConversationDto
+            {
+                UserId = p.UserId,
+                Username = p.Username,
+                DisplayName = p.DisplayName,
+                ProfilePictureUrl = p.ProfilePictureUrl,
+                IsOnline = p.IsOnline,
+                LastMessage = p.LastMessageId.HasValue ? new MessageDto
+                {
+                    Id = p.LastMessageId.Value,
+                    SenderId = p.LastMessageSenderId ?? Guid.Empty,
+                    ReceiverId = p.LastMessageReceiverId ?? Guid.Empty,
+                    MessageText = p.LastMessageText ?? string.Empty,
+                    SentAt = p.LastMessageSentAt ?? DateTime.UtcNow,
+                    DeliveredAt = p.LastMessageDeliveredAt,
+                    ReadAt = p.LastMessageReadAt
+                } : null,
+                UnreadCount = p.UnreadCount,
+                LastActivity = p.LastActivity
+            }).ToList();
+
+            return new ConversationListResponse { Conversations = convs, TotalCount = convs.Count };
+        }
 
     public async Task<SendMessageResponse> SendMessageAsync(Guid senderId, Guid receiverId, string messageText, CancellationToken ct = default)
     {

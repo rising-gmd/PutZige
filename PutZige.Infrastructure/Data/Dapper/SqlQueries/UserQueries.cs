@@ -30,4 +30,20 @@ public static class UserQueries
         WHERE Id = @Id
           AND IsDeleted = 0;
         """;
+    public const string SEARCH_USERS =
+        """
+        SELECT TOP(@Limit)
+            Id,
+            Username,
+            DisplayName,
+            Email,
+            NULL AS JobTitle,
+            Bio,
+            ProfilePictureUrl
+        FROM Users
+        WHERE (Username LIKE @Query OR DisplayName LIKE @Query)
+          AND Id != @CurrentUserId
+          AND IsDeleted = 0
+        ORDER BY Username;
+        """;
 }

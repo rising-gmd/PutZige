@@ -54,6 +54,16 @@ namespace PutZige.API.Controllers
                 Expires = DateTimeOffset.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpiryMinutes)
             });
 
+            // Set non-HttpOnly XSRF token cookie so frontend JS can read it
+            Response.Cookies.Append("XSRF-TOKEN", Guid.NewGuid().ToString(), new Microsoft.AspNetCore.Http.CookieOptions
+            {
+                HttpOnly = false,
+                Secure = true,
+                SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Strict,
+                Path = PutZige.Application.Common.Constants.ApiConstants.API_PATH,
+                Expires = DateTimeOffset.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpiryMinutes)
+            });
+
             Response.Cookies.Append(PutZige.Application.Common.Constants.CookieConstants.REFRESH_TOKEN, response.RefreshToken, new Microsoft.AspNetCore.Http.CookieOptions
             {
                 HttpOnly = true,
@@ -61,6 +71,16 @@ namespace PutZige.API.Controllers
                 SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Strict,
                 Path = PutZige.Application.Common.Constants.ApiConstants.API_PATH,
                 Expires = DateTimeOffset.UtcNow.AddDays(_jwtSettings.RefreshTokenExpiryDays)
+            });
+
+            // Rotate XSRF token
+            Response.Cookies.Append("XSRF-TOKEN", Guid.NewGuid().ToString(), new Microsoft.AspNetCore.Http.CookieOptions
+            {
+                HttpOnly = false,
+                Secure = true,
+                SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Strict,
+                Path = PutZige.Application.Common.Constants.ApiConstants.API_PATH,
+                Expires = DateTimeOffset.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpiryMinutes)
             });
 
             // Return user profile only
@@ -132,6 +152,7 @@ namespace PutZige.API.Controllers
 
             Response.Cookies.Delete(PutZige.Application.Common.Constants.CookieConstants.ACCESS_TOKEN, new Microsoft.AspNetCore.Http.CookieOptions { Path = PutZige.Application.Common.Constants.ApiConstants.API_PATH });
             Response.Cookies.Delete(PutZige.Application.Common.Constants.CookieConstants.REFRESH_TOKEN, new Microsoft.AspNetCore.Http.CookieOptions { Path = PutZige.Application.Common.Constants.ApiConstants.API_PATH });
+            Response.Cookies.Delete("XSRF-TOKEN", new Microsoft.AspNetCore.Http.CookieOptions { Path = PutZige.Application.Common.Constants.ApiConstants.API_PATH });
 
             return Success<object>(null, ResponseCodes.LOGOUT_SUCCESS, "Logged out successfully");
         }

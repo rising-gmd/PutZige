@@ -40,5 +40,7 @@ namespace PutZige.Application.Interfaces
         /// Gets the profile for the current authenticated user. Throws if user not found or unauthorized.
         /// </summary>
         Task<UserProfileResponse> GetMyProfileAsync(CancellationToken ct = default);
+
+        Task<PutZige.Domain.DTOs.UserSearchProjection[]> SearchUsersAsync(string query, CancellationToken ct = default);
     }
 }

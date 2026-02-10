@@ -52,5 +52,11 @@ namespace PutZige.Application.Common.Constants
         public const string JWT_SECRET_NOT_CONFIGURED = "JWT_SECRET_NOT_CONFIGURED";
         public const string JWT_SECRET_TOO_SHORT = "JWT_SECRET_TOO_SHORT";
         public const string PROFILE_RETRIEVED_SUCCESSFULLY = "PROFILE_RETRIEVED_SUCCESSFULLY";
+        // Messaging
+        public const string MESSAGE_SENT = "MESSAGE_SENT";
+        public const string CONVERSATION_RETRIEVED = "CONVERSATION_RETRIEVED";
+        public const string USERS_FOUND = "USERS_FOUND";
+        public const string CONVERSATIONS_RETRIEVED = "CONVERSATIONS_RETRIEVED";
+        public const string MESSAGE_MARKED_AS_READ = "MESSAGE_MARKED_AS_READ";
     }
 }

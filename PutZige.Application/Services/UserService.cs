@@ -50,6 +50,19 @@ namespace PutZige.Application.Services
             _dapperUserRepository = dapperUserRepository;
         }
 
+        public async Task<PutZige.Domain.DTOs.UserSearchProjection[]> SearchUsersAsync(string query, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(query)) return Array.Empty<PutZige.Domain.DTOs.UserSearchProjection>();
+
+            var currentUserId = _currentUserService?.TryGetUserId() ?? Guid.Empty;
+
+            if (_dapperUserRepository == null) return Array.Empty<PutZige.Domain.DTOs.UserSearchProjection>();
+
+            var results = await _dapperUserRepository.SearchUsersAsync(query, currentUserId, 20, ct).ConfigureAwait(false);
+
+            return results is null ? Array.Empty<PutZige.Domain.DTOs.UserSearchProjection>() : System.Linq.Enumerable.ToArray(results);
+        }
+
         // Minimal internal no-op implementation for tests or contexts without HTTP context.
         private sealed class NoOpCurrentUserService : PutZige.Application.Interfaces.ICurrentUserService
         {

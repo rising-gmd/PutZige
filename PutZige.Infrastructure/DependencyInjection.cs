@@ -99,6 +99,7 @@ public static class DependencyInjection
         // Dapper context and repositories
         services.AddScoped<DapperContext>();
         services.AddScoped<IDapperUserRepository, DapperUserRepository>();
+        services.AddScoped<PutZige.Domain.Interfaces.IDapperMessageRepository, PutZige.Infrastructure.Repositories.Dapper.DapperMessageRepository>();
 
         // Register Hangfire background service types
         services.AddScoped<EmailBackgroundService>();

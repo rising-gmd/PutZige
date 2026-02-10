@@ -96,6 +96,17 @@ namespace PutZige.API.Extensions
                             builder.AllowCredentials();
                             // Expose Set-Cookie so browsers can access cookie headers when AllowCredentials is true
                             builder.WithExposedHeaders("Set-Cookie");
+                            // Ensure X-XSRF-TOKEN is allowed via headers by adding it to AllowedHeaders if missing in configuration
+                            try
+                            {
+                                var headers = settings.AllowedHeaders ?? new System.Collections.Generic.List<string>();
+                                if (!headers.Contains("X-XSRF-TOKEN", System.StringComparer.OrdinalIgnoreCase))
+                                {
+                                    // Re-apply header allowance explicitly
+                                    builder.WithHeaders(headers.Concat(new[] { "X-XSRF-TOKEN" }).ToArray());
+                                }
+                            }
+                            catch { }
                         }
 
                         // Preflight caching for performance

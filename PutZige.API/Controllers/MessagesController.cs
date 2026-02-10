@@ -3,6 +3,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PutZige.Application.DTOs.Messaging;
@@ -35,7 +36,7 @@ public sealed class MessagesController : BaseApiController
         {
             var userId = _currentUserService.GetUserId();
             var response = await _messagingService.SendMessageAsync(userId, request.ReceiverId, request.MessageText, ct);
-            return Created(response, ResponseCodes.LOGIN_SUCCESS, SuccessMessages.Messaging.MessageSent);
+            return Success(response, ResponseCodes.MESSAGE_SENT, SuccessMessages.Messaging.MessageSent);
         }
 
     [HttpGet("conversation/{otherUserId}")]
@@ -44,13 +45,14 @@ public sealed class MessagesController : BaseApiController
         {
             var userId = _currentUserService.GetUserId();
             var response = await _messagingService.GetConversationHistoryAsync(userId, otherUserId, pageNumber, pageSize, ct);
-            return Success(response, ResponseCodes.LOGIN_SUCCESS);
+            return Success(response, ResponseCodes.CONVERSATION_RETRIEVED);
         }
 
     [HttpPatch("{messageId}/read")]
-        public async Task<ActionResult<ApiResponse<object>>> MarkAsRead(Guid messageId, CancellationToken ct = default)
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+        public async Task<IActionResult> MarkAsRead(Guid messageId, CancellationToken ct = default)
         {
             await _messagingService.MarkMessageAsReadAsync(messageId, ct);
-            return Success<object>(null, ResponseCodes.LOGIN_SUCCESS, SuccessMessages.Messaging.MessageMarkedAsRead);
+            return NoContent();
         }
 }

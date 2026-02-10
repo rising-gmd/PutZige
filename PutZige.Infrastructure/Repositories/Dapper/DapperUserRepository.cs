@@ -22,6 +22,30 @@ namespace PutZige.Infrastructure.Repositories.Dapper
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
+        public async Task<System.Collections.Generic.IEnumerable<PutZige.Domain.DTOs.UserSearchProjection>> SearchUsersAsync(string query, Guid currentUserId, int limit, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(query)) return System.Array.Empty<PutZige.Domain.DTOs.UserSearchProjection>();
+
+            var conn = _context.GetOpenConnection();
+
+            try
+            {
+                var param = new { Query = $"%{query}%", CurrentUserId = currentUserId, Limit = limit };
+                var result = await conn.QueryAsync<PutZige.Domain.DTOs.UserSearchProjection>(new CommandDefinition(UserQueries.SEARCH_USERS, param, cancellationToken: ct)).ConfigureAwait(false);
+                return result;
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("Dapper SearchUsersAsync canceled");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Dapper SearchUsersAsync failed");
+                throw;
+            }
+        }
+
         public async Task<PutZige.Domain.DTOs.UserProfileProjection?> GetProfileByIdAsync(Guid id, CancellationToken ct = default)
         {
             if (id == Guid.Empty) return null;
