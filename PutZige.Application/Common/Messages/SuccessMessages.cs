@@ -26,5 +26,11 @@ namespace PutZige.Application.Common.Messages
             public const string MessageSent = "Message sent successfully";
             public const string MessageMarkedAsRead = "Message marked as read";
         }
+
+        public static class UserProfile
+        {
+            public const string ProfileUpdated = "User profile updated successfully.";
+            public const string ProfileRetrieved = "User profile retrieved successfully.";
+        }
     }
 }

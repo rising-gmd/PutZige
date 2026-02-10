@@ -10,7 +10,24 @@ public static class UserQueries
             EmailVerificationTokenExpiry = NULL,
             UpdatedAt = GETUTCDATE()
         WHERE EmailVerificationToken = @Token
+          AND IsDeleted = 0
           AND IsEmailVerified = 0
           AND EmailVerificationTokenExpiry > GETUTCDATE();
+        """;
+
+    public const string GET_USER_PROFILE_BY_ID =
+        """
+        SELECT
+            Id,
+            Username,
+            Email,
+            DisplayName,
+            Bio,
+            ProfilePictureUrl,
+            CreatedAt,
+            LastLoginAt AS LastSeenAt
+        FROM Users
+        WHERE Id = @Id
+          AND IsDeleted = 0;
         """;
 }

@@ -3,6 +3,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using PutZige.Application.DTOs.Auth;
+using PutZige.Application.DTOs.Common;
 
 namespace PutZige.Application.Interfaces
 {
@@ -34,5 +35,10 @@ namespace PutZige.Application.Interfaces
         /// Updates user's last login info and session details.
         /// </summary>
         Task UpdateLoginInfoAsync(Guid userId, string? ipAddress, string refreshToken, DateTime refreshTokenExpiry, CancellationToken ct = default);
+
+        /// <summary>
+        /// Gets the profile for the current authenticated user. Throws if user not found or unauthorized.
+        /// </summary>
+        Task<UserProfileResponse> GetMyProfileAsync(CancellationToken ct = default);
     }
 }

@@ -12,6 +12,7 @@ using PutZige.Application.Common;
 using PutZige.Application.Common.Messages;
 using Microsoft.Extensions.Logging;
 using AutoMapper;
+using PutZige.Application.DTOs.Common;
 
 namespace PutZige.Application.Services
 {
@@ -27,8 +28,10 @@ namespace PutZige.Application.Services
         private readonly IHashingService _hashingService;
         private readonly PutZige.Application.Interfaces.IBackgroundJobDispatcher _backgroundJobDispatcher;
         private readonly IDateTimeProvider _dateTimeProvider;
+        private readonly PutZige.Application.Interfaces.ICurrentUserService _currentUserService;
+        private readonly PutZige.Domain.Interfaces.IDapperUserRepository? _dapperUserRepository;
 
-        public UserService(IUserRepository userRepository, IUnitOfWork unitOfWork, IMapper mapper, IHashingService hashingService, IDateTimeProvider dateTimeProvider, PutZige.Application.Interfaces.IBackgroundJobDispatcher? backgroundJobDispatcher = null, ILogger<UserService>? logger = null)
+        public UserService(IUserRepository userRepository, IUnitOfWork unitOfWork, IMapper mapper, IHashingService hashingService, IDateTimeProvider dateTimeProvider, PutZige.Application.Interfaces.ICurrentUserService currentUserService, PutZige.Domain.Interfaces.IDapperUserRepository? dapperUserRepository = null, PutZige.Application.Interfaces.IBackgroundJobDispatcher? backgroundJobDispatcher = null, ILogger<UserService>? logger = null)
         {
             ArgumentNullException.ThrowIfNull(userRepository);
             ArgumentNullException.ThrowIfNull(unitOfWork);
@@ -41,8 +44,38 @@ namespace PutZige.Application.Services
             _mapper = mapper;
             _logger = logger;
             _hashingService = hashingService;
-            _backgroundJobDispatcher = backgroundJobDispatcher ?? new PutZige.Application.Services.NoOpBackgroundJobDispatcher();
+            _backgroundJobDispatcher = backgroundJobDispatcher ?? new NoOpBackgroundJobDispatcher();
             _dateTimeProvider = dateTimeProvider;
+            _currentUserService = currentUserService ?? throw new ArgumentNullException(nameof(currentUserService));
+            _dapperUserRepository = dapperUserRepository;
+        }
+
+        /// <summary>
+        /// Returns a profile DTO for the given user id.
+        /// </summary>
+        public async Task<UserProfileResponse> GetMyProfileAsync(CancellationToken ct = default)
+        {
+            var userId = _currentUserService.GetUserId();
+
+            var user = await _dapperUserRepository.GetProfileByIdAsync(userId, ct).ConfigureAwait(false);
+
+            if (user == null)
+            {
+                throw new KeyNotFoundException(ErrorMessages.General.ResourceNotFound);
+            }
+
+            return new UserProfileResponse
+            {
+                Id = user.Id,
+                Username = user.Username,
+                Email = user.Email,
+                DisplayName = user.DisplayName,
+                JobTitle = null,
+                Bio = user.Bio,
+                ProfilePictureUrl = user.ProfilePictureUrl,
+                CreatedAt = user.CreatedAt,
+                LastSeenAt = user.LastSeenAt
+            };
         }
 
         /// <summary>

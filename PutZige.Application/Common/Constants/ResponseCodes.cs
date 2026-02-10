@@ -48,5 +48,6 @@ namespace PutZige.Application.Common.Constants
         public const string PAGE_SIZE_OUT_OF_RANGE = "PAGE_SIZE_OUT_OF_RANGE";
         public const string JWT_SECRET_NOT_CONFIGURED = "JWT_SECRET_NOT_CONFIGURED";
         public const string JWT_SECRET_TOO_SHORT = "JWT_SECRET_TOO_SHORT";
+        public const string PROFILE_RETRIEVED_SUCCESSFULLY = "PROFILE_RETRIEVED_SUCCESSFULLY";
     }
 }
