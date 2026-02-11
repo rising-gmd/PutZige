@@ -24,9 +24,35 @@ namespace PutZige.Infrastructure.Data.Configurations
             builder.HasOne(m => m.Sender).WithMany(u => u.SentMessages).HasForeignKey(m => m.SenderId).OnDelete(DeleteBehavior.Restrict);
             builder.HasOne(m => m.Receiver).WithMany(u => u.ReceivedMessages).HasForeignKey(m => m.ReceiverId).OnDelete(DeleteBehavior.Restrict);
 
-            // Indexes for inbox and conversation queries
-            builder.HasIndex(m => new { m.ReceiverId, m.SentAt }).HasDatabaseName("IX_Messages_ReceiverId_SentAt");
-            builder.HasIndex(m => new { m.SenderId, m.ReceiverId, m.SentAt }).HasDatabaseName("IX_Messages_SenderId_ReceiverId_SentAt");
+            // === PERFORMANCE INDEXES FOR REAL-TIME CHAT AT SCALE ===
+            
+            // 1. Inbox query: Get messages received by user, ordered by time (used for unread counts, inbox)
+            builder.HasIndex(m => new { m.ReceiverId, m.SentAt })
+                .HasDatabaseName("IX_Messages_ReceiverId_SentAt")
+                .IsDescending(false, true);
+
+            // 2. Conversation query: Get messages between two users with covering columns
+            //    This index supports WHERE (SenderId=@A AND ReceiverId=@B) OR (SenderId=@B AND ReceiverId=@A)
+            builder.HasIndex(m => new { m.SenderId, m.ReceiverId, m.SentAt })
+                .HasDatabaseName("IX_Messages_Conversation")
+                .IsDescending(false, false, true);
+
+            // 3. Reverse conversation lookup: Allows SQL Server to use index for either direction
+            builder.HasIndex(m => new { m.ReceiverId, m.SenderId, m.SentAt })
+                .HasDatabaseName("IX_Messages_Conversation_Reverse")
+                .IsDescending(false, false, true);
+
+            // 4. Unread messages: Filtered index for getting unread count per sender (WHERE ReadAt IS NULL)
+            //    Critical for badge counts and conversation list unread indicators
+            builder.HasIndex(m => new { m.ReceiverId, m.SenderId })
+                .HasDatabaseName("IX_Messages_Unread")
+                .HasFilter("[ReadAt] IS NULL AND [IsDeleted] = 0");
+
+            // 5. Message delivery status: For updating delivery/read timestamps by message ID
+            //    Primary key handles this, but we add composite for batch operations
+            builder.HasIndex(m => new { m.ReceiverId, m.DeliveredAt })
+                .HasDatabaseName("IX_Messages_DeliveryStatus")
+                .HasFilter("[DeliveredAt] IS NULL AND [IsDeleted] = 0");
         }
     }
 }

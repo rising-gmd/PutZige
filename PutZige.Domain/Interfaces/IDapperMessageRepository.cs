@@ -1,10 +1,39 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace PutZige.Domain.Interfaces
 {
+    /// <summary>
+    /// High-performance Dapper-based message repository for read operations.
+    /// Optimized for real-time chat at scale.
+    /// </summary>
     public interface IDapperMessageRepository
     {
-        Task<IEnumerable<PutZige.Domain.DTOs.ConversationProjection>> GetConversationsForUserAsync(System.Guid userId, int limit, CancellationToken ct = default);
+        /// <summary>
+        /// Get conversation list for a user with last message and unread counts.
+        /// </summary>
+        Task<IEnumerable<PutZige.Domain.DTOs.ConversationProjection>> GetConversationsForUserAsync(Guid userId, int limit, CancellationToken ct = default);
+
+        /// <summary>
+        /// Get paginated conversation history between two users.
+        /// </summary>
+        Task<(IEnumerable<PutZige.Domain.DTOs.MessageProjection> Messages, long TotalCount)> GetConversationHistoryAsync(
+            Guid userId, 
+            Guid otherUserId, 
+            int pageNumber, 
+            int pageSize, 
+            CancellationToken ct = default);
+
+        /// <summary>
+        /// Get total unread message count for a user across all conversations.
+        /// </summary>
+        Task<long> GetTotalUnreadCountAsync(Guid userId, CancellationToken ct = default);
+
+        /// <summary>
+        /// Mark all messages from a sender as read (bulk operation).
+        /// </summary>
+        Task<int> MarkConversationAsReadAsync(Guid userId, Guid otherUserId, CancellationToken ct = default);
     }
 }

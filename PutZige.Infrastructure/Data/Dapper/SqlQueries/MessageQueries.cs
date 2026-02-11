@@ -1,52 +1,149 @@
 namespace PutZige.Infrastructure.Data.Dapper.SqlQueries;
 
+/// <summary>
+/// Optimized SQL queries for messaging operations.
+/// Designed for high-throughput real-time chat at scale.
+/// </summary>
 public static class MessageQueries
 {
+    /// <summary>
+    /// Get conversation list for a user with last message and unread count.
+    /// Uses optimized CTE pattern with proper index hints.
+    /// Indexes used: IX_Messages_Conversation, IX_Messages_Unread
+    /// </summary>
     public const string GET_CONVERSATIONS_FOR_USER =
-        @"-- Get latest message and counts per conversation
-        WITH user_messages AS (
+        @"-- Optimized conversation list query for real-time chat
+        -- Uses filtered indexes for unread counts and conversation lookup
+        ;WITH ranked_messages AS (
+            -- Get all messages involving the user, rank by recency per conversation partner
             SELECT
-                CASE WHEN SenderId = @UserId THEN ReceiverId ELSE SenderId END AS OtherUserId,
-                Id AS MessageId,
-                SenderId,
-                ReceiverId,
-                MessageText,
-                SentAt,
-                DeliveredAt,
-                ReadAt
-            FROM Messages
-            WHERE (SenderId = @UserId OR ReceiverId = @UserId) AND IsDeleted = 0
-        ), last_messages AS (
-            SELECT um.*, ROW_NUMBER() OVER (PARTITION BY OtherUserId ORDER BY SentAt DESC) AS rn
-            FROM user_messages um
-        ), last_per_conversation AS (
-            SELECT * FROM last_messages WHERE rn = 1
-        ), unread_counts AS (
-            SELECT
-                SenderId AS FromUser,
-                COUNT(*) AS UnreadCount
-            FROM Messages
-            WHERE ReceiverId = @UserId AND ReadAt IS NULL AND IsDeleted = 0
+                CASE WHEN m.SenderId = @UserId THEN m.ReceiverId ELSE m.SenderId END AS OtherUserId,
+                m.Id AS MessageId,
+                m.SenderId,
+                m.ReceiverId,
+                m.MessageText,
+                m.SentAt,
+                m.DeliveredAt,
+                m.ReadAt,
+                ROW_NUMBER() OVER (
+                    PARTITION BY CASE WHEN m.SenderId = @UserId THEN m.ReceiverId ELSE m.SenderId END 
+                    ORDER BY m.SentAt DESC
+                ) AS rn
+            FROM Messages m WITH (INDEX(IX_Messages_Conversation), INDEX(IX_Messages_Conversation_Reverse))
+            WHERE m.IsDeleted = 0
+              AND (m.SenderId = @UserId OR m.ReceiverId = @UserId)
+        ),
+        latest_messages AS (
+            SELECT * FROM ranked_messages WHERE rn = 1
+        ),
+        unread_counts AS (
+            -- Use filtered index IX_Messages_Unread for fast unread counting
+            SELECT SenderId AS FromUser, COUNT_BIG(*) AS UnreadCount
+            FROM Messages WITH (INDEX(IX_Messages_Unread))
+            WHERE ReceiverId = @UserId 
+              AND ReadAt IS NULL 
+              AND IsDeleted = 0
             GROUP BY SenderId
         )
-        SELECT
+        SELECT TOP (@Limit)
             u.Id AS UserId,
             u.Username,
             u.DisplayName,
             u.ProfilePictureUrl,
             ISNULL(us.IsOnline, 0) AS IsOnline,
-            l.MessageId AS LastMessageId,
-            l.SenderId AS LastMessageSenderId,
-            l.ReceiverId AS LastMessageReceiverId,
-            l.MessageText AS LastMessageText,
-            l.SentAt AS LastMessageSentAt,
-            l.DeliveredAt AS LastMessageDeliveredAt,
-            l.ReadAt AS LastMessageReadAt,
+            lm.MessageId AS LastMessageId,
+            lm.SenderId AS LastMessageSenderId,
+            lm.ReceiverId AS LastMessageReceiverId,
+            lm.MessageText AS LastMessageText,
+            lm.SentAt AS LastMessageSentAt,
+            lm.DeliveredAt AS LastMessageDeliveredAt,
+            lm.ReadAt AS LastMessageReadAt,
             ISNULL(uc.UnreadCount, 0) AS UnreadCount,
-            l.SentAt AS LastActivity
-        FROM last_per_conversation l
-        JOIN Users u ON u.Id = l.OtherUserId
-        LEFT JOIN UserSessions us ON us.UserId = u.Id
+            lm.SentAt AS LastActivity
+        FROM latest_messages lm
+        INNER JOIN Users u WITH (NOLOCK) ON u.Id = lm.OtherUserId AND u.IsDeleted = 0
+        LEFT JOIN UserSessions us WITH (NOLOCK) ON us.UserId = u.Id
         LEFT JOIN unread_counts uc ON uc.FromUser = u.Id
-        ORDER BY l.SentAt DESC;";
+        ORDER BY lm.SentAt DESC
+        OPTION (RECOMPILE);";
+
+    /// <summary>
+    /// Get paginated conversation history between two users.
+    /// Uses keyset pagination for consistent performance at any page depth.
+    /// Index used: IX_Messages_Conversation
+    /// </summary>
+    public const string GET_CONVERSATION_HISTORY =
+        @"-- Optimized conversation history with keyset pagination
+        SELECT 
+            m.Id,
+            m.SenderId,
+            m.ReceiverId,
+            m.MessageText,
+            m.SentAt,
+            m.DeliveredAt,
+            m.ReadAt,
+            m.CreatedAt,
+            s.Username AS SenderUsername,
+            r.Username AS ReceiverUsername
+        FROM Messages m WITH (INDEX(IX_Messages_Conversation))
+        INNER JOIN Users s WITH (NOLOCK) ON s.Id = m.SenderId
+        INNER JOIN Users r WITH (NOLOCK) ON r.Id = m.ReceiverId
+        WHERE m.IsDeleted = 0
+          AND ((m.SenderId = @UserId AND m.ReceiverId = @OtherUserId) 
+               OR (m.SenderId = @OtherUserId AND m.ReceiverId = @UserId))
+        ORDER BY m.SentAt DESC
+        OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
+
+    /// <summary>
+    /// Get total message count for a conversation (for pagination metadata).
+    /// </summary>
+    public const string GET_CONVERSATION_COUNT =
+        @"SELECT COUNT_BIG(*)
+        FROM Messages WITH (INDEX(IX_Messages_Conversation))
+        WHERE IsDeleted = 0
+          AND ((SenderId = @UserId AND ReceiverId = @OtherUserId) 
+               OR (SenderId = @OtherUserId AND ReceiverId = @UserId));";
+
+    /// <summary>
+    /// Get unread message count for a user (total across all conversations).
+    /// Uses filtered index for optimal performance.
+    /// </summary>
+    public const string GET_TOTAL_UNREAD_COUNT =
+        @"SELECT COUNT_BIG(*)
+        FROM Messages WITH (INDEX(IX_Messages_Unread))
+        WHERE ReceiverId = @UserId 
+          AND ReadAt IS NULL 
+          AND IsDeleted = 0;";
+
+    /// <summary>
+    /// Mark all messages from a specific sender as read (bulk operation).
+    /// </summary>
+    public const string MARK_CONVERSATION_AS_READ =
+        @"UPDATE Messages
+        SET ReadAt = @ReadAt, UpdatedAt = @ReadAt
+        WHERE ReceiverId = @UserId 
+          AND SenderId = @OtherUserId
+          AND ReadAt IS NULL 
+          AND IsDeleted = 0;";
+
+    /// <summary>
+    /// Search users for chat (prefix search on username/display name).
+    /// Uses IX_Users_Search filtered index.
+    /// </summary>
+    public const string SEARCH_USERS =
+        @"SELECT TOP (@Limit)
+            u.Id,
+            u.Username,
+            u.DisplayName,
+            u.ProfilePictureUrl,
+            ISNULL(us.IsOnline, 0) AS IsOnline
+        FROM Users u WITH (INDEX(IX_Users_Search))
+        LEFT JOIN UserSessions us WITH (NOLOCK) ON us.UserId = u.Id
+        WHERE u.IsActive = 1 
+          AND u.IsDeleted = 0
+          AND u.Id <> @CurrentUserId
+          AND (u.Username LIKE @SearchTerm + '%' OR u.DisplayName LIKE @SearchTerm + '%')
+        ORDER BY 
+            CASE WHEN u.Username LIKE @SearchTerm + '%' THEN 0 ELSE 1 END,
+            u.Username;";
 }

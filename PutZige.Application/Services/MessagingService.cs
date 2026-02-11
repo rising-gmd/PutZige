@@ -128,20 +128,53 @@ namespace PutZige.Application.Services
 
             ValidateConversationHistoryRequest(otherUserId, pageNumber, pageSize);
 
-            var (messages, totalCount) = await _messageRepository
+            // Use Dapper for optimized read performance when available
+            if (_dapperMessageRepository != null)
+            {
+                var (projections, totalCount) = await _dapperMessageRepository
+                    .GetConversationHistoryAsync(userId, otherUserId, pageNumber, pageSize, ct)
+                    .ConfigureAwait(false);
+
+                if (totalCount == 0)
+                {
+                    throw new AppException(ResponseCodes.NOT_FOUND, "Conversation not found");
+                }
+
+                var messageDtos = projections.Select(p => new MessageDto
+                {
+                    Id = p.Id,
+                    SenderId = p.SenderId,
+                    ReceiverId = p.ReceiverId,
+                    MessageText = p.MessageText,
+                    SentAt = p.SentAt,
+                    DeliveredAt = p.DeliveredAt,
+                    ReadAt = p.ReadAt
+                }).ToList();
+
+                return new ConversationHistoryResponse
+                {
+                    Messages = messageDtos,
+                    TotalCount = (int)totalCount,
+                    PageNumber = pageNumber,
+                    PageSize = pageSize
+                };
+            }
+
+            // Fallback to EF Core if Dapper not available
+            var (messages, efTotalCount) = await _messageRepository
                 .GetConversationAsync(userId, otherUserId, pageNumber, pageSize, ct);
 
-            if (totalCount == 0)
+            if (efTotalCount == 0)
             {
                 throw new AppException(ResponseCodes.NOT_FOUND, "Conversation not found");
             }
 
-            var messageDtos = messages.Select(m => _mapper.Map<MessageDto>(m)).ToList();
+            var efMessageDtos = messages.Select(m => _mapper.Map<MessageDto>(m)).ToList();
 
             return new ConversationHistoryResponse
             {
-                Messages = messageDtos,
-                TotalCount = totalCount,
+                Messages = efMessageDtos,
+                TotalCount = efTotalCount,
                 PageNumber = pageNumber,
                 PageSize = pageSize
             };
