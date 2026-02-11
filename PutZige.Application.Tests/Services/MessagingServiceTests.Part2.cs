@@ -28,6 +28,7 @@ public partial class MessagingServiceTests
         // Arrange
         var user = Guid.NewGuid();
         var other = Guid.NewGuid();
+        _mockCurrentUserService.Setup(c => c.GetUserId()).Returns(user);
         var messages = new List<Message>
         {
             CreateMessage(user, other, DateTime.UtcNow, "m1"),
@@ -55,14 +56,14 @@ public partial class MessagingServiceTests
         // Arrange
         var user = Guid.NewGuid();
         var other = Guid.NewGuid();
+        _mockCurrentUserService.Setup(c => c.GetUserId()).Returns(user);
         _mockMessageRepo.Setup(r => r.GetConversationAsync(user, other, 1, 10, It.IsAny<CancellationToken>())).ReturnsAsync((Enumerable.Empty<Message>(), 0));
 
         // Act
-        var res = await _sut.GetConversationHistoryAsync(other, 1, 10, _ct);
+        Func<Task> act = async () => await _sut.GetConversationHistoryAsync(other, 1, 10, _ct);
 
         // Assert
-        res.Messages.Should().BeEmpty();
-        res.TotalCount.Should().Be(0);
+        await act.Should().ThrowAsync<PutZige.Application.Common.AppException>();
     }
 
     /// <summary>
@@ -113,6 +114,7 @@ public partial class MessagingServiceTests
         // Arrange
         var user = Guid.NewGuid();
         var other = Guid.NewGuid();
+        _mockCurrentUserService.Setup(c => c.GetUserId()).Returns(user);
         var all = Enumerable.Range(0,5).Select(i => CreateMessage(user, other, DateTime.UtcNow.AddMinutes(-i), $"m{i}"));
         _mockMessageRepo.Setup(r => r.GetConversationAsync(user, other, 1, 2, It.IsAny<CancellationToken>())).ReturnsAsync((all.Take(2), 5));
         _mockMapper.Setup(m => m.Map<MessageDto>(It.IsAny<Message>())).Returns((Message msg) => new MessageDto{Id=msg.Id, MessageText=msg.MessageText, SentAt=msg.SentAt, SenderId=msg.SenderId, ReceiverId=msg.ReceiverId});
@@ -134,6 +136,7 @@ public partial class MessagingServiceTests
         // Arrange
         var user = Guid.NewGuid();
         var other = Guid.NewGuid();
+        _mockCurrentUserService.Setup(c => c.GetUserId()).Returns(user);
         var all = Enumerable.Range(0,4).Select(i => CreateMessage(user, other, DateTime.UtcNow.AddMinutes(-i), $"m{i}"));
         _mockMessageRepo.Setup(r => r.GetConversationAsync(user, other, 2, 2, It.IsAny<CancellationToken>())).ReturnsAsync((all.Skip(2).Take(2), 4));
         _mockMapper.Setup(m => m.Map<MessageDto>(It.IsAny<Message>())).Returns((Message msg) => new MessageDto{Id=msg.Id, MessageText=msg.MessageText, SentAt=msg.SentAt, SenderId=msg.SenderId, ReceiverId=msg.ReceiverId});
@@ -155,6 +158,7 @@ public partial class MessagingServiceTests
         // Arrange
         var user = Guid.NewGuid();
         var other = Guid.NewGuid();
+        _mockCurrentUserService.Setup(c => c.GetUserId()).Returns(user);
         var m = CreateMessage(user, other, DateTime.UtcNow, "maptest");
         _mockMessageRepo.Setup(r => r.GetConversationAsync(user, other, 1, 10, It.IsAny<CancellationToken>())).ReturnsAsync((new[] { m }, 1));
         _mockMapper.Setup(m => m.Map<MessageDto>(It.IsAny<Message>())).Returns((Message msg) => new MessageDto{Id=msg.Id, MessageText=msg.MessageText, SentAt=msg.SentAt, SenderId=msg.SenderId, ReceiverId=msg.ReceiverId});

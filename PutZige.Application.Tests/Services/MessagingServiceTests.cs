@@ -24,6 +24,8 @@ public partial class MessagingServiceTests
     private readonly Mock<IMapper> _mockMapper;
     private readonly Mock<ILogger<MessagingService>> _mockLogger;
     private readonly Mock<PutZige.Application.Interfaces.IRealTimeNotifier> _mockRealTimeNotifier;
+    private readonly Mock<PutZige.Application.Interfaces.ICurrentUserService> _mockCurrentUserService;
+    private readonly Mock<PutZige.Application.Interfaces.IDateTimeProvider> _mockDateTimeProvider;
     private readonly MessagingService _sut;
     private readonly CancellationToken _ct = CancellationToken.None;
 
@@ -35,6 +37,14 @@ public partial class MessagingServiceTests
         _mockMapper = new Mock<IMapper>();
         _mockLogger = new Mock<ILogger<MessagingService>>();
         _mockRealTimeNotifier = new Mock<PutZige.Application.Interfaces.IRealTimeNotifier>();
+        _mockCurrentUserService = new Mock<PutZige.Application.Interfaces.ICurrentUserService>();
+        _mockDateTimeProvider = new Mock<PutZige.Application.Interfaces.IDateTimeProvider>();
+
+        // Setup CurrentUserService to return a valid user ID by default
+        _mockCurrentUserService.Setup(c => c.GetUserId()).Returns(Guid.NewGuid());
+        
+        // Setup DateTimeProvider to return UtcNow
+        _mockDateTimeProvider.Setup(d => d.UtcNow).Returns(() => DateTime.UtcNow);
 
         // Default mapper behaviors used across tests
         _mockMapper.Setup(m => m.Map<SendMessageResponse>(It.IsAny<Message>())).Returns((Message msg) => new SendMessageResponse(msg.Id, msg.SenderId, msg.ReceiverId, msg.MessageText, msg.SentAt));
@@ -45,7 +55,7 @@ public partial class MessagingServiceTests
         // Also setup the overload that accepts include expressions to avoid Moq overload resolution mismatches
         _mockUserRepo.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>(), It.IsAny<System.Linq.Expressions.Expression<Func<Domain.Entities.User, object>>[]>())).ReturnsAsync((Guid id, CancellationToken _, System.Linq.Expressions.Expression<Func<Domain.Entities.User, object>>[] __) => new Domain.Entities.User { Id = id });
 
-        _sut = new MessagingService(_mockMessageRepo.Object, _mockUserRepo.Object, _mockUow.Object, _mockMapper.Object, _mockRealTimeNotifier.Object, new Mock<PutZige.Application.Interfaces.ICurrentUserService>().Object, new Mock<PutZige.Application.Interfaces.IDateTimeProvider>().Object, _mockLogger.Object);
+        _sut = new MessagingService(_mockMessageRepo.Object, _mockUserRepo.Object, _mockUow.Object, _mockMapper.Object, _mockRealTimeNotifier.Object, _mockCurrentUserService.Object, _mockDateTimeProvider.Object, _mockLogger.Object);
     }
 
     // Helper to create a message entity
@@ -68,6 +78,8 @@ public partial class MessagingServiceTests
         // Arrange
         var sender = Guid.NewGuid();
         var receiver = Guid.NewGuid();
+        _mockCurrentUserService.Setup(c => c.GetUserId()).Returns(sender);
+        _mockUserRepo.Setup(r => r.GetByIdAsync(sender, It.IsAny<CancellationToken>())).ReturnsAsync(new Domain.Entities.User { Id = sender });
         _mockUserRepo.Setup(r => r.GetByIdAsync(receiver, It.IsAny<CancellationToken>())).ReturnsAsync(new Domain.Entities.User { Id = receiver });
         Message? captured = null;
         _mockMessageRepo.Setup(r => r.AddAsync(It.IsAny<Message>(), It.IsAny<CancellationToken>())).Callback<Message, CancellationToken>((m, ct) => captured = m).Returns(Task.CompletedTask);
@@ -94,6 +106,8 @@ public partial class MessagingServiceTests
         // Arrange
         var sender = Guid.NewGuid();
         var receiver = Guid.NewGuid();
+        _mockCurrentUserService.Setup(c => c.GetUserId()).Returns(sender);
+        _mockUserRepo.Setup(r => r.GetByIdAsync(sender, It.IsAny<CancellationToken>())).ReturnsAsync(new Domain.Entities.User { Id = sender });
         _mockUserRepo.Setup(r => r.GetByIdAsync(receiver, It.IsAny<CancellationToken>())).ReturnsAsync((Domain.Entities.User?)null);
 
         // Act

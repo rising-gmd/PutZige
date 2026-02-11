@@ -271,7 +271,7 @@ namespace PutZige.Application.Tests.Services
             // Arrange
             var email = "testresend_sendfail@example.com";
             var user = CreateUnverifiedUser(email, "tokfail");
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByEmailForUpdateAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
             _backgroundDispatcher.Setup(d => d.EnqueueVerificationEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>())).Throws(new Exception("bg fail"));
 
             var svc = CreateService();
@@ -361,8 +361,9 @@ namespace PutZige.Application.Tests.Services
             results.Should().Contain(false);
             user.IsEmailVerified.Should().BeTrue();
 
-            _userRepo.Verify(r => r.GetByVerificationTokenAsync(token, It.IsAny<CancellationToken>()), Times.Exactly(2));
-            _dapperUserRepo.Verify(d => d.VerifyEmailByTokenAsync(token, It.IsAny<CancellationToken>()), Times.Exactly(2));
+            _userRepo.Verify(r => r.GetByVerificationTokenAsync(token, It.IsAny<CancellationToken>()), Times.AtLeast(1));
+            // The second concurrent request may throw early if it sees IsEmailVerified=true before calling Dapper
+            _dapperUserRepo.Verify(d => d.VerifyEmailByTokenAsync(token, It.IsAny<CancellationToken>()), Times.AtLeast(1));
         }
 
         [Fact]
@@ -434,7 +435,7 @@ namespace PutZige.Application.Tests.Services
             user.EmailVerificationSentCount = 3;
             user.LastEmailVerificationSentAt = DateTime.UtcNow.AddMinutes(30);
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByEmailForUpdateAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
 
             var svc = CreateService();
 
@@ -455,7 +456,7 @@ namespace PutZige.Application.Tests.Services
             user.EmailVerificationSentCount = 3;
             user.LastEmailVerificationSentAt = DateTime.UtcNow.AddMinutes(10);
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByEmailForUpdateAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
 
             var svc = CreateService();
 
@@ -476,7 +477,7 @@ namespace PutZige.Application.Tests.Services
             user.EmailVerificationSentCount = 3;
             user.LastEmailVerificationSentAt = DateTime.UtcNow.AddHours(-1).AddMinutes(-1); // more than 1 hour ago
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByEmailForUpdateAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
             _backgroundDispatcher.Setup(d => d.EnqueueVerificationEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()));
 
             var svc = CreateService();
@@ -499,7 +500,7 @@ namespace PutZige.Application.Tests.Services
             user.EmailVerificationSentCount = 3;
             user.LastEmailVerificationSentAt = DateTime.UtcNow.AddMinutes(-59);
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByEmailForUpdateAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
 
             var svc = CreateService();
 
@@ -520,7 +521,7 @@ namespace PutZige.Application.Tests.Services
             user.EmailVerificationSentCount = 3;
             user.LastEmailVerificationSentAt = DateTime.UtcNow.AddMinutes(-61);
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByEmailForUpdateAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
             _backgroundDispatcher.Setup(d => d.EnqueueVerificationEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()));
 
             var svc = CreateService();
@@ -542,7 +543,7 @@ namespace PutZige.Application.Tests.Services
             user.EmailVerificationSentCount = 0;
             user.LastEmailVerificationSentAt = null;
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByEmailForUpdateAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
             _backgroundDispatcher.Setup(d => d.EnqueueVerificationEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()));
 
             var svc = CreateService();
@@ -608,7 +609,7 @@ namespace PutZige.Application.Tests.Services
             var user = CreateUnverifiedUser(email, oldToken);
             user.EmailVerificationSentCount = 1;
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByEmailForUpdateAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
             _backgroundDispatcher.Setup(d => d.EnqueueVerificationEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()));
 
             var svc = CreateService();
@@ -630,7 +631,7 @@ namespace PutZige.Application.Tests.Services
             var oldToken = "oldtokenvalue2";
             var user = CreateUnverifiedUser(email, oldToken, DateTime.UtcNow.AddDays(-1));
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByEmailForUpdateAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
             _backgroundDispatcher.Setup(d => d.EnqueueVerificationEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()));
 
             var svc = CreateService();
@@ -651,7 +652,7 @@ namespace PutZige.Application.Tests.Services
             var oldToken = "oldtokenvalue3";
             var user = CreateUnverifiedUser(email, oldToken);
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByEmailForUpdateAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
             _backgroundDispatcher.Setup(d => d.EnqueueVerificationEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()));
 
             var svc = CreateService();
@@ -674,7 +675,7 @@ namespace PutZige.Application.Tests.Services
             var oldToken = "oldtokenvalue4";
             var user = CreateUnverifiedUser(email, oldToken);
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByEmailForUpdateAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
             _backgroundDispatcher.Setup(d => d.EnqueueVerificationEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()));
 
             var svc = CreateService();
@@ -695,7 +696,7 @@ namespace PutZige.Application.Tests.Services
             var user = CreateUnverifiedUser(email, "tokinc");
             user.EmailVerificationSentCount = 2;
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByEmailForUpdateAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
             _backgroundDispatcher.Setup(d => d.EnqueueVerificationEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()));
 
             var svc = CreateService();
@@ -716,7 +717,7 @@ namespace PutZige.Application.Tests.Services
             var user = CreateUnverifiedUser(email, "tokints");
             user.LastEmailVerificationSentAt = null;
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByEmailForUpdateAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
             _backgroundDispatcher.Setup(d => d.EnqueueVerificationEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()));
 
             var svc = CreateService();
@@ -735,7 +736,7 @@ namespace PutZige.Application.Tests.Services
         {
             // Arrange
             var email = "testresend_notfound@example.com";
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync((User?)null);
+            _userRepo.Setup(r => r.GetByEmailForUpdateAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync((User?)null);
 
             var svc = CreateService();
 
@@ -755,7 +756,7 @@ namespace PutZige.Application.Tests.Services
             var user = CreateUnverifiedUser(email, "tokenvx");
             user.IsEmailVerified = true;
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByEmailForUpdateAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
 
             var svc = CreateService();
 
@@ -788,7 +789,7 @@ namespace PutZige.Application.Tests.Services
             var oldToken = "oldtokenxyz";
             var user = CreateUnverifiedUser(email, oldToken);
 
-            _userRepo.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+            _userRepo.Setup(r => r.GetByEmailForUpdateAsync(email, It.IsAny<CancellationToken>())).ReturnsAsync(user);
             _backgroundDispatcher.Setup(d => d.EnqueueVerificationEmail(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()));
 
             var svc = CreateService();
@@ -809,7 +810,7 @@ namespace PutZige.Application.Tests.Services
             var oldToken = "oldtokentoinvalidate";
             var user = CreateUnverifiedUser(email, oldToken);
 
-            _userRepo.SetupSequence(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>()))
+            _userRepo.SetupSequence(r => r.GetByEmailForUpdateAsync(email, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(user) // for resend
                 .ReturnsAsync(user); // for verify
 

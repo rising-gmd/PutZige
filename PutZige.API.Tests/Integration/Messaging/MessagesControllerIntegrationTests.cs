@@ -235,8 +235,8 @@ public class MessagesControllerIntegrationTests : Integration.IntegrationTestBas
         Client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
         var res = await Client.GetAsync($"/api/v1/messages/conversation/{other}?pageNumber=0&pageSize=10");
-        // may be BadRequest for validation or Unauthorized if auth failed
-        res.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.Unauthorized);
+        // Invalid page number (0) causes validation error (400), but if conversation doesn't exist, returns 404
+        res.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.NotFound, HttpStatusCode.Unauthorized);
     }
 
     /// <summary>
@@ -623,9 +623,10 @@ public class MessagesControllerIntegrationTests : Integration.IntegrationTestBas
 
         Client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
         var res = await Client.PatchAsync(string.Format(TestApiEndpoints.MessageRead, messageId), null);
-        res.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.BadRequest, HttpStatusCode.Unauthorized);
+        // PATCH operations return 204 NoContent on success (REST best practice)
+        res.StatusCode.Should().BeOneOf(HttpStatusCode.NoContent, HttpStatusCode.BadRequest, HttpStatusCode.Unauthorized);
 
-        if (res.StatusCode == HttpStatusCode.OK)
+        if (res.StatusCode == HttpStatusCode.NoContent)
         {
             using (var scope = Factory.Services.CreateScope())
             {

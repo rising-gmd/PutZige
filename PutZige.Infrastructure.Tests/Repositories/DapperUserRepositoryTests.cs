@@ -19,12 +19,18 @@ namespace PutZige.Infrastructure.Tests.Repositories
         [Fact]
         public async Task SearchUsersAsync_WithEmptyQuery_ReturnsEmpty()
         {
-            var context = new Mock<DapperContext>(MockBehavior.Strict, null as Microsoft.Extensions.Options.IOptions<PutZige.Infrastructure.Settings.DatabaseSettings>);
+            // Arrange - create a real DapperContext with a dummy connection string (won't be used for empty query)
+            var dbSettings = new PutZige.Infrastructure.Settings.DatabaseSettings { ConnectionString = "Server=dummy;Database=dummy;" };
+            var options = Microsoft.Extensions.Options.Options.Create(dbSettings);
+            var context = new DapperContext(options);
             var logger = Mock.Of<ILogger<DapperUserRepository>>();
 
-            var repo = new DapperUserRepository(context.Object, logger);
+            var repo = new DapperUserRepository(context, logger);
 
+            // Act
             var res = await repo.SearchUsersAsync("", Guid.NewGuid(), 20, CancellationToken.None);
+            
+            // Assert
             res.Should().BeEmpty();
         }
     }
