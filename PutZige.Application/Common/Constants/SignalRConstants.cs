@@ -2,7 +2,7 @@ namespace PutZige.Application.Common.Constants
 {
     public static class SignalRConstants
     {
-        public const string HubRoute = "/hubs/chat";
+        public const string HubRoute = "/api/v1/hubs/chat";
 
         public static class Events
         {
