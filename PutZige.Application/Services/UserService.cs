@@ -1,18 +1,19 @@
 #nullable enable
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using PutZige.Application.Interfaces;
+using AutoMapper;
+using Microsoft.Extensions.Logging;
+using PutZige.Application.Common;
+using PutZige.Application.Common.Constants;
+using PutZige.Application.Common.Messages;
+using PutZige.Application.Common.Users;
 using PutZige.Application.DTOs.Auth;
+using PutZige.Application.DTOs.Common;
+using PutZige.Application.Interfaces;
 using PutZige.Domain.Entities;
 using PutZige.Domain.Interfaces;
-using System.Security.Cryptography;
-using PutZige.Application.Common.Constants;
-using PutZige.Application.Common;
-using PutZige.Application.Common.Messages;
-using Microsoft.Extensions.Logging;
-using AutoMapper;
-using PutZige.Application.DTOs.Common;
 
 namespace PutZige.Application.Services
 {
@@ -26,12 +27,21 @@ namespace PutZige.Application.Services
         private readonly ILogger<UserService>? _logger;
         private readonly IMapper _mapper;
         private readonly IHashingService _hashingService;
-        private readonly PutZige.Application.Interfaces.IBackgroundJobDispatcher _backgroundJobDispatcher;
+        private readonly IBackgroundJobDispatcher _backgroundJobDispatcher;
         private readonly IDateTimeProvider _dateTimeProvider;
-        private readonly PutZige.Application.Interfaces.ICurrentUserService _currentUserService;
-        private readonly PutZige.Domain.Interfaces.IDapperUserRepository? _dapperUserRepository;
+        private readonly ICurrentUserService _currentUserService;
+        private readonly IDapperUserRepository? _dapperUserRepository;
 
-        public UserService(IUserRepository userRepository, IUnitOfWork unitOfWork, IMapper mapper, IHashingService hashingService, IDateTimeProvider dateTimeProvider, PutZige.Application.Interfaces.ICurrentUserService? currentUserService = null, PutZige.Domain.Interfaces.IDapperUserRepository? dapperUserRepository = null, PutZige.Application.Interfaces.IBackgroundJobDispatcher? backgroundJobDispatcher = null, ILogger<UserService>? logger = null)
+        public UserService(
+            IUserRepository userRepository,
+            IUnitOfWork unitOfWork,
+            IMapper mapper,
+            IHashingService hashingService,
+            IDateTimeProvider dateTimeProvider,
+            ICurrentUserService? currentUserService = null,
+            IDapperUserRepository? dapperUserRepository = null,
+            IBackgroundJobDispatcher? backgroundJobDispatcher = null,
+            ILogger<UserService>? logger = null)
         {
             ArgumentNullException.ThrowIfNull(userRepository);
             ArgumentNullException.ThrowIfNull(unitOfWork);
@@ -50,31 +60,60 @@ namespace PutZige.Application.Services
             _dapperUserRepository = dapperUserRepository;
         }
 
-        public async Task<PutZige.Domain.DTOs.UserSearchProjection[]> SearchUsersAsync(string query, CancellationToken ct = default)
+        /// <summary>
+        /// Searches for users by query string with validation and mapping.
+        /// </summary>
+        public async Task<UserSearchResponse> SearchUsersAsync(string query, CancellationToken ct = default)
         {
-            if (string.IsNullOrWhiteSpace(query)) return Array.Empty<PutZige.Domain.DTOs.UserSearchProjection>();
+            // Validation logic moved from controller
+            if (string.IsNullOrWhiteSpace(query) || query.Length < 1)
+            {
+                throw new AppException(ResponseCodes.VALIDATION_FAILED, "Query parameter is required and must be at least 1 character");
+            }
 
             var currentUserId = _currentUserService?.TryGetUserId() ?? Guid.Empty;
 
-            if (_dapperUserRepository == null) return Array.Empty<PutZige.Domain.DTOs.UserSearchProjection>();
+            if (_dapperUserRepository == null)
+            {
+                return new UserSearchResponse
+                {
+                    Users = Array.Empty<UserSearchDto>(),
+                    TotalCount = 0
+                };
+            }
 
             var results = await _dapperUserRepository.SearchUsersAsync(query, currentUserId, 20, ct).ConfigureAwait(false);
 
-            return results is null ? Array.Empty<PutZige.Domain.DTOs.UserSearchProjection>() : System.Linq.Enumerable.ToArray(results);
-        }
+            if (results == null || !results.Any())
+            {
+                return new UserSearchResponse
+                {
+                    Users = Array.Empty<UserSearchDto>(),
+                    TotalCount = 0
+                };
+            }
 
-        // Minimal internal no-op implementation for tests or contexts without HTTP context.
-        private sealed class NoOpCurrentUserService : PutZige.Application.Interfaces.ICurrentUserService
-        {
-            public Guid GetUserId() => Guid.Empty;
-            public Guid? TryGetUserId() => null;
-            public string? GetUserEmail() => null;
-            public string? GetUserName() => null;
-            public bool IsAuthenticated() => false;
+            // Mapping logic moved from controller
+            var userDtos = results.Select(u => new UserSearchDto
+            {
+                Id = u.Id,
+                Username = u.Username,
+                DisplayName = u.DisplayName,
+                Email = u.Email,
+                JobTitle = u.JobTitle,
+                Bio = u.Bio,
+                ProfilePictureUrl = u.ProfilePictureUrl
+            }).ToArray();
+
+            return new UserSearchResponse
+            {
+                Users = userDtos,
+                TotalCount = userDtos.Length
+            };
         }
 
         /// <summary>
-        /// Returns a profile DTO for the given user id.
+        /// Returns a profile DTO for the current authenticated user.
         /// </summary>
         public async Task<UserProfileResponse> GetMyProfileAsync(CancellationToken ct = default)
         {
@@ -158,7 +197,7 @@ namespace PutZige.Application.Services
             {
                 _backgroundJobDispatcher.EnqueueVerificationEmail(user.Email, user.Username, user.EmailVerificationToken!);
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 _logger?.LogError(ex, "Failed to enqueue verification email for user {Email}", user.Email);
             }
@@ -215,8 +254,6 @@ namespace PutZige.Application.Services
                     IsOnline = true,
                     LastActiveAt = _dateTimeProvider.UtcNow
                 };
-                // Attach session via repository Add if available
-                // Using DbContext tracking since we fetched user with GetByIdAsync
             }
             else
             {
@@ -228,6 +265,15 @@ namespace PutZige.Application.Services
             }
 
             await _unitOfWork.SaveChangesAsync(ct);
+        }
+
+        private sealed class NoOpCurrentUserService : ICurrentUserService
+        {
+            public Guid GetUserId() => Guid.Empty;
+            public Guid? TryGetUserId() => null;
+            public string? GetUserEmail() => null;
+            public string? GetUserName() => null;
+            public bool IsAuthenticated() => false;
         }
     }
 }
