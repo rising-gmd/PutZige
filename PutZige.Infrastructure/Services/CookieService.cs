@@ -88,7 +88,7 @@ namespace PutZige.Infrastructure.Services
             {
                 HttpOnly = true,
                 Secure = true,
-                SameSite = SameSiteMode.Strict,
+                SameSite = SameSiteMode.None, // Allow cross-origin (required for Chrome when frontend is different origin)
                 Path = path
             };
         }
