@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Hosting;
 using PutZige.Application.Settings;
+using PutZige.Application.Common.Constants;
 
 namespace PutZige.API.Extensions
 {
@@ -95,18 +96,16 @@ namespace PutZige.API.Extensions
                             // AllowCredentials requires explicit origins (cannot be used with AllowAnyOrigin)
                             builder.AllowCredentials();
                             // Expose Set-Cookie so browsers can access cookie headers when AllowCredentials is true
-                            builder.WithExposedHeaders("Set-Cookie");
-                            // Ensure X-XSRF-TOKEN is allowed via headers by adding it to AllowedHeaders if missing in configuration
-                            try
+                            builder.WithExposedHeaders(HeaderConstants.SetCookie);
+
+                            // Ensure required headers are allowed (SignalR + XSRF)
+                            var headers = settings.AllowedHeaders ?? new System.Collections.Generic.List<string>();
+                            var requiredHeaders = new[] { HeaderConstants.XsrfToken, HeaderConstants.XRequestedWith, HeaderConstants.XSignalRUserAgent };
+                            var missingHeaders = requiredHeaders.Where(h => !headers.Contains(h, System.StringComparer.OrdinalIgnoreCase));
+                            if (missingHeaders.Any())
                             {
-                                var headers = settings.AllowedHeaders ?? new System.Collections.Generic.List<string>();
-                                if (!headers.Contains("X-XSRF-TOKEN", System.StringComparer.OrdinalIgnoreCase))
-                                {
-                                    // Re-apply header allowance explicitly
-                                    builder.WithHeaders(headers.Concat(new[] { "X-XSRF-TOKEN" }).ToArray());
-                                }
+                                builder.WithHeaders(headers.Concat(missingHeaders).ToArray());
                             }
-                            catch { }
                         }
 
                         // Preflight caching for performance
