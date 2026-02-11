@@ -10,8 +10,7 @@ namespace PutZige.Application.Validators.Auth
         public LoginRequestValidator()
         {
             RuleFor(x => x.Identifier)
-                .NotEmpty().WithMessage(ErrorMessages.Validation.EmailRequired)
-                .EmailAddress().WithMessage(ErrorMessages.Validation.EmailInvalidFormat)
+                .NotEmpty().WithMessage(ErrorMessages.Validation.IdentifierRequired)
                 .WithName("identifier");
 
             RuleFor(x => x.Password)
