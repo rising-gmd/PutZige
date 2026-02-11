@@ -46,12 +46,14 @@ namespace PutZige.Application.Tests.Services
             var mockClient = new Mock<IClientInfoService>();
             var mockHash = new Mock<IHashingService>();
             var mockDate = new Mock<IDateTimeProvider>();
+            var mockCurrentUser = new Mock<ICurrentUserService>();
+            mockCurrentUser.Setup(x => x.GetUserId()).Returns(userId);
 
             var jwtSettings = Options.Create(new JwtSettings { Secret = new string('x', 32), Issuer = "i", Audience = "a", AccessTokenExpiryMinutes = 15, RefreshTokenExpiryDays = 7 });
 
-            var svc = new AuthService(mockUserRepo.Object, mockUow.Object, mockJwt.Object, mockUserService.Object, mockMapper.Object, jwtSettings, mockClient.Object, mockHash.Object, mockDate.Object, null, Mock.Of<ILogger<AuthService>>(), null);
+            var svc = new AuthService(mockUserRepo.Object, mockUow.Object, mockJwt.Object, mockUserService.Object, mockMapper.Object, jwtSettings, mockClient.Object, mockHash.Object, mockDate.Object, mockCurrentUser.Object, null, Mock.Of<ILogger<AuthService>>(), null);
 
-            await svc.LogoutAsync(userId, CancellationToken.None);
+            await svc.LogoutAsync(CancellationToken.None);
 
             Assert.Null(user.Session.RefreshTokenHash);
             Assert.Null(user.Session.RefreshTokenSalt);
@@ -77,12 +79,14 @@ namespace PutZige.Application.Tests.Services
             var mockClient = new Mock<IClientInfoService>();
             var mockHash = new Mock<IHashingService>();
             var mockDate = new Mock<IDateTimeProvider>();
+            var mockCurrentUser = new Mock<ICurrentUserService>();
+            mockCurrentUser.Setup(x => x.GetUserId()).Returns(userId);
 
             var jwtSettings = Options.Create(new JwtSettings { Secret = new string('x', 32), Issuer = "i", Audience = "a", AccessTokenExpiryMinutes = 15, RefreshTokenExpiryDays = 7 });
 
-            var svc = new AuthService(mockUserRepo.Object, mockUow.Object, mockJwt.Object, mockUserService.Object, mockMapper.Object, jwtSettings, mockClient.Object, mockHash.Object, mockDate.Object, null, Mock.Of<ILogger<AuthService>>(), null);
+            var svc = new AuthService(mockUserRepo.Object, mockUow.Object, mockJwt.Object, mockUserService.Object, mockMapper.Object, jwtSettings, mockClient.Object, mockHash.Object, mockDate.Object, mockCurrentUser.Object, null, Mock.Of<ILogger<AuthService>>(), null);
 
-            await svc.LogoutAsync(userId, CancellationToken.None);
+            await svc.LogoutAsync(CancellationToken.None);
 
             mockUow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
         }

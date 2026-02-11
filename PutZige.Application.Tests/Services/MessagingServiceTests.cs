@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -45,7 +45,7 @@ public partial class MessagingServiceTests
         // Also setup the overload that accepts include expressions to avoid Moq overload resolution mismatches
         _mockUserRepo.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>(), It.IsAny<System.Linq.Expressions.Expression<Func<Domain.Entities.User, object>>[]>())).ReturnsAsync((Guid id, CancellationToken _, System.Linq.Expressions.Expression<Func<Domain.Entities.User, object>>[] __) => new Domain.Entities.User { Id = id });
 
-        _sut = new MessagingService(_mockMessageRepo.Object, _mockUserRepo.Object, _mockUow.Object, _mockMapper.Object, _mockRealTimeNotifier.Object, _mockLogger.Object);
+        _sut = new MessagingService(_mockMessageRepo.Object, _mockUserRepo.Object, _mockUow.Object, _mockMapper.Object, _mockRealTimeNotifier.Object, new Mock<PutZige.Application.Interfaces.ICurrentUserService>().Object, new Mock<PutZige.Application.Interfaces.IDateTimeProvider>().Object, _mockLogger.Object);
     }
 
     // Helper to create a message entity
@@ -75,7 +75,7 @@ public partial class MessagingServiceTests
         _mockMapper.Setup(m => m.Map<SendMessageResponse>(It.IsAny<Message>())).Returns((Message msg) => new SendMessageResponse(msg.Id, msg.SenderId, msg.ReceiverId, msg.MessageText, msg.SentAt));
 
         // Act
-        var res = await _sut.SendMessageAsync(sender, receiver, "hello", _ct);
+        var res = await _sut.SendMessageAsync(receiver, "hello", _ct);
 
         // Assert
         res.Should().NotBeNull();
@@ -97,7 +97,7 @@ public partial class MessagingServiceTests
         _mockUserRepo.Setup(r => r.GetByIdAsync(receiver, It.IsAny<CancellationToken>())).ReturnsAsync((Domain.Entities.User?)null);
 
         // Act
-        Func<Task> act = async () => await _sut.SendMessageAsync(sender, receiver, "hello", _ct);
+        Func<Task> act = async () => await _sut.SendMessageAsync(receiver, "hello", _ct);
 
         // Assert
         await act.Should().ThrowAsync<KeyNotFoundException>();
@@ -115,7 +115,7 @@ public partial class MessagingServiceTests
         var longText = new string('x', PutZige.Application.Common.Constants.AppConstants.Messaging.MaxMessageLength + 1);
 
         // Act
-        Func<Task> act = async () => await _sut.SendMessageAsync(sender, receiver, longText, _ct);
+        Func<Task> act = async () => await _sut.SendMessageAsync(receiver, longText, _ct);
 
         // Assert
         await act.Should().ThrowAsync<PutZige.Application.Common.AppException>();
@@ -135,7 +135,7 @@ public partial class MessagingServiceTests
         _mockMapper.Setup(m => m.Map<SendMessageResponse>(It.IsAny<Message>())).Returns((Message msg) => new SendMessageResponse(msg.Id, msg.SenderId, msg.ReceiverId, msg.MessageText, msg.SentAt));
 
         // Act
-        var res = await _sut.SendMessageAsync(id, id, "self", _ct);
+        var res = await _sut.SendMessageAsync(id, "self", _ct);
 
         // Assert
         res.Should().NotBeNull();
@@ -152,7 +152,7 @@ public partial class MessagingServiceTests
         var receiver = Guid.NewGuid();
 
         // Act
-        Func<Task> act = async () => await _sut.SendMessageAsync(sender, receiver, "   ", _ct);
+        Func<Task> act = async () => await _sut.SendMessageAsync(receiver, "   ", _ct);
 
         // Assert
         await act.Should().ThrowAsync<PutZige.Application.Common.AppException>();
@@ -173,7 +173,7 @@ public partial class MessagingServiceTests
         _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         // Act
-        var res = await _sut.SendMessageAsync(sender, receiver, "hello", _ct);
+        var res = await _sut.SendMessageAsync(receiver, "hello", _ct);
 
         // Assert
         res.Should().NotBeNull();
@@ -194,7 +194,7 @@ public partial class MessagingServiceTests
         _mockMessageRepo.Setup(r => r.AddAsync(It.IsAny<Message>(), It.IsAny<CancellationToken>())).ThrowsAsync(new InvalidOperationException("db"));
 
         // Act
-        Func<Task> act = async () => await _sut.SendMessageAsync(sender, receiver, "hello", _ct);
+        Func<Task> act = async () => await _sut.SendMessageAsync(receiver, "hello", _ct);
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>();
@@ -217,7 +217,7 @@ public partial class MessagingServiceTests
         _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         // Act
-        var res = await _sut.SendMessageAsync(sender, receiver, "hello", _ct);
+        var res = await _sut.SendMessageAsync(receiver, "hello", _ct);
 
         // Assert
         captured.Should().NotBeNull();
@@ -240,7 +240,7 @@ public partial class MessagingServiceTests
         _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         // Act
-        await _sut.SendMessageAsync(sender, receiver, "hello", _ct);
+        await _sut.SendMessageAsync(receiver, "hello", _ct);
 
         // Assert
         captured.Should().NotBeNull();
@@ -248,3 +248,4 @@ public partial class MessagingServiceTests
     }
 
 }
+

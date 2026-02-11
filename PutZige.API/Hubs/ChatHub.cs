@@ -93,7 +93,7 @@ public class ChatHub : Hub
                 throw new InvalidOperationException("User is not authenticated or invalid user ID");
             }
 
-            var response = await _messagingService.SendMessageAsync(senderId, receiverId, messageText);
+            var response = await _messagingService.SendMessageAsync(receiverId, messageText);
 
             if (_connectionMapping.TryGetConnection(receiverId, out var connectionId))
             {

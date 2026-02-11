@@ -29,6 +29,7 @@ namespace PutZige.Application.Tests.Services
         private readonly Mock<IHashingService> _mockHashingService = new();
         private readonly Mock<IBackgroundJobDispatcher> _backgroundDispatcher = new();
         private readonly Mock<IDateTimeProvider> _mockDateTime = new();
+        private readonly Mock<ICurrentUserService> _mockCurrentUserService = new();
         private readonly Mock<PutZige.Domain.Interfaces.IDapperUserRepository> _dapperUserRepo = new();
         private readonly JwtSettings _jwtSettings = new() { Secret = "TestSecretKeyThatIsLongEnough-1234567890", Issuer = "PutZige", Audience = "PutZige.Users", AccessTokenExpiryMinutes = 15, RefreshTokenExpiryDays = 7 };
 
@@ -63,7 +64,7 @@ namespace PutZige.Application.Tests.Services
 
         private AuthService CreateService()
         {
-            return new AuthService(_userRepo.Object, _uow.Object, new TestJwtTokenService(), _userService.Object, new AutoMapper.MapperConfiguration(cfg => { }).CreateMapper(), Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
+            return new AuthService(_userRepo.Object, _uow.Object, new TestJwtTokenService(), _userService.Object, new AutoMapper.MapperConfiguration(cfg => { }).CreateMapper(), Options.Create(_jwtSettings), _mockClientInfo.Object, _mockHashingService.Object, _mockDateTime.Object, _mockCurrentUserService.Object, _dapperUserRepo.Object, _logger.Object, _backgroundDispatcher.Object);
         }
 
         private User CreateUnverifiedUser(string email, string token, DateTime? expiry = null)

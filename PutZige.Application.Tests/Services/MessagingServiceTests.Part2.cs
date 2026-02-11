@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -38,7 +38,7 @@ public partial class MessagingServiceTests
         _mockMapper.Setup(m => m.Map<MessageDto>(It.IsAny<Message>())).Returns((Message msg) => new MessageDto { Id = msg.Id, MessageText = msg.MessageText, SenderId = msg.SenderId, ReceiverId = msg.ReceiverId, SentAt = msg.SentAt });
 
         // Act
-        var res = await _sut.GetConversationHistoryAsync(user, other, 1, 2, _ct);
+        var res = await _sut.GetConversationHistoryAsync(other, 1, 2, _ct);
 
         // Assert
         res.Should().NotBeNull();
@@ -58,7 +58,7 @@ public partial class MessagingServiceTests
         _mockMessageRepo.Setup(r => r.GetConversationAsync(user, other, 1, 10, It.IsAny<CancellationToken>())).ReturnsAsync((Enumerable.Empty<Message>(), 0));
 
         // Act
-        var res = await _sut.GetConversationHistoryAsync(user, other, 1, 10, _ct);
+        var res = await _sut.GetConversationHistoryAsync(other, 1, 10, _ct);
 
         // Assert
         res.Messages.Should().BeEmpty();
@@ -78,7 +78,7 @@ public partial class MessagingServiceTests
         var other = Guid.NewGuid();
 
         // Act
-        Func<Task> act = async () => await _sut.GetConversationHistoryAsync(user, other, page, 10, _ct);
+        Func<Task> act = async () => await _sut.GetConversationHistoryAsync(other, page, 10, _ct);
 
         // Assert
         await act.Should().ThrowAsync<ArgumentOutOfRangeException>();
@@ -98,7 +98,7 @@ public partial class MessagingServiceTests
         var other = Guid.NewGuid();
 
         // Act
-        Func<Task> act = async () => await _sut.GetConversationHistoryAsync(user, other, 1, pageSize, _ct);
+        Func<Task> act = async () => await _sut.GetConversationHistoryAsync(other, 1, pageSize, _ct);
 
         // Assert
         await act.Should().ThrowAsync<ArgumentOutOfRangeException>();
@@ -118,7 +118,7 @@ public partial class MessagingServiceTests
         _mockMapper.Setup(m => m.Map<MessageDto>(It.IsAny<Message>())).Returns((Message msg) => new MessageDto{Id=msg.Id, MessageText=msg.MessageText, SentAt=msg.SentAt, SenderId=msg.SenderId, ReceiverId=msg.ReceiverId});
 
         // Act
-        var res = await _sut.GetConversationHistoryAsync(user, other, 1, 2, _ct);
+        var res = await _sut.GetConversationHistoryAsync(other, 1, 2, _ct);
 
         // Assert
         res.Messages.Should().HaveCount(2);
@@ -139,7 +139,7 @@ public partial class MessagingServiceTests
         _mockMapper.Setup(m => m.Map<MessageDto>(It.IsAny<Message>())).Returns((Message msg) => new MessageDto{Id=msg.Id, MessageText=msg.MessageText, SentAt=msg.SentAt, SenderId=msg.SenderId, ReceiverId=msg.ReceiverId});
 
         // Act
-        var res = await _sut.GetConversationHistoryAsync(user, other, 2, 2, _ct);
+        var res = await _sut.GetConversationHistoryAsync(other, 2, 2, _ct);
 
         // Assert
         res.Messages.Should().HaveCount(2);
@@ -160,7 +160,7 @@ public partial class MessagingServiceTests
         _mockMapper.Setup(m => m.Map<MessageDto>(It.IsAny<Message>())).Returns((Message msg) => new MessageDto{Id=msg.Id, MessageText=msg.MessageText, SentAt=msg.SentAt, SenderId=msg.SenderId, ReceiverId=msg.ReceiverId});
 
         // Act
-        var res = await _sut.GetConversationHistoryAsync(user, other, 1, 10, _ct);
+        var res = await _sut.GetConversationHistoryAsync(other, 1, 10, _ct);
 
         // Assert
         res.Messages.First().MessageText.Should().Be("maptest");
@@ -201,3 +201,4 @@ public partial class MessagingServiceTests
     }
 
 }
+

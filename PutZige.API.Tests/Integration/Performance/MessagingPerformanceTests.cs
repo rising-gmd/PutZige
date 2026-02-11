@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using System;
 using System.Diagnostics;
 using System.Linq;
@@ -176,7 +176,7 @@ namespace PutZige.API.Tests.Integration.Performance
             var svc = scope2.ServiceProvider.GetRequiredService<IMessagingService>();
 
             var sw = Stopwatch.StartNew();
-            var res = await svc.GetConversationHistoryAsync(a, b, 1, 50);
+            var res = await svc.GetConversationHistoryAsync(b, 1, 50);
             sw.Stop();
 
             res.TotalCount.Should().Be(2000);
@@ -185,3 +185,4 @@ namespace PutZige.API.Tests.Integration.Performance
         }
     }
 }
+

@@ -36,8 +36,8 @@ namespace PutZige.Application.Tests.Services
             var results = await svc.SearchUsersAsync("ali", CancellationToken.None);
 
             results.Should().NotBeNull();
-            results.Should().ContainSingle();
-            results[0].Username.Should().Be("alice");
+            results.Users.Should().ContainSingle();
+            results.Users.First().Username.Should().Be("alice");
         }
     }
 }
