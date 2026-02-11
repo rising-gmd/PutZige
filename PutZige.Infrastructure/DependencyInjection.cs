@@ -96,6 +96,9 @@ public static class DependencyInjection
         // Connection mapping service used by SignalR hubs to avoid static state
         services.AddSingleton<IConnectionMappingService, ConnectionMappingService>();
 
+        // Cookie service for authentication cookie management
+        services.AddScoped<ICookieService, CookieService>();
+
         // Dapper context and repositories
         services.AddScoped<DapperContext>();
         services.AddScoped<IDapperUserRepository, DapperUserRepository>();

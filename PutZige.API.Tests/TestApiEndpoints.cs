@@ -7,6 +7,8 @@ namespace PutZige.API.Tests
         // Auth endpoints
         public const string AuthLogin = "/api/v1/auth/login";
         public const string AuthRefreshToken = "/api/v1/auth/refresh-token";
+        public const string AuthMe = "/api/v1/auth/me";
+        public const string AuthLogout = "/api/v1/auth/logout";
 
         // Users endpoints
         public const string Users = "/api/v1/users";
@@ -19,7 +21,7 @@ namespace PutZige.API.Tests
 
         // Messages endpoints
         public const string Messages = "/api/v1/messages";
-        public const string MessagesConversation = "/api/v1/messages/conversation";
+        public const string MessagesConversation = "/api/v1/conversations";
         public const string MessageRead = "/api/v1/messages/{0}/read";
         public const string MessageMarkAsRead = "/api/v1/messages/{0}/mark-as-read";
         public const string MessageById = "/api/v1/messages/{0}";

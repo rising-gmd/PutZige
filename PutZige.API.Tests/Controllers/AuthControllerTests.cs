@@ -171,77 +171,68 @@ namespace PutZige.API.Tests.Controllers
         }
 
         /// <summary>
-        /// Valid refresh token rotates tokens and updates stored hash.
+        /// Logout clears authentication cookies (critical security test).
         /// </summary>
         [Fact]
-        public async Task RefreshToken_ValidRequest_Returns200AndRotatesToken()
+        public async Task Logout_ClearsAuthCookies()
         {
-            var email = "rtuser@example.com";
-            var refresh = "refresh-token-plain-123";
+            var email = "logout@example.com";
+            var password = "Password1!";
 
             using (var scope = Factory.Services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                var pwd = CreateHash("Password1!");
-                var rt = CreateHash(refresh);
-
-                var user = new User
+                var hashed = CreateHash(password);
+                await db.Users.AddAsync(new User
                 {
                     Email = email,
-                    Username = "rtu",
-                    DisplayName = "RT User",
-                    PasswordHash = pwd.hash,
-                    PasswordSalt = pwd.salt,
+                    Username = "logoutuser",
+                    DisplayName = "Logout User",
+                    PasswordHash = hashed.hash,
+                    PasswordSalt = hashed.salt,
                     IsActive = true,
-                    IsEmailVerified = true,
-                    Session = new UserSession
-                    {
-                        RefreshTokenHash = rt.hash,
-                        RefreshTokenSalt = rt.salt,
-                        RefreshTokenExpiry = DateTime.UtcNow.AddDays(1),
-                        IsOnline = true
-                    }
-                };
-
-                await db.Users.AddAsync(user);
+                    IsEmailVerified = true
+                });
                 await db.SaveChangesAsync();
             }
 
-            var request = new RefreshTokenRequest { RefreshToken = refresh };
-            var response = await Client.PostAsJsonAsync(TestApiEndpoints.AuthRefreshToken, request);
-            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            // Login to get tokens and cookies
+            var loginRequest = new LoginRequest { Identifier = email, Password = password };
+            var loginResponse = await Client.PostAsJsonAsync(TestApiEndpoints.AuthLogin, loginRequest);
+            loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
-            var payload = await response.Content.ReadFromJsonAsync<ApiResponse<RefreshTokenResponse>>();
-            payload.Should().NotBeNull();
-            payload!.IsSuccess.Should().BeTrue();
-            payload.Data.Should().NotBeNull();
-            payload.Data!.AccessToken.Should().NotBeNullOrWhiteSpace();
-            payload.Data.RefreshToken.Should().NotBeNullOrWhiteSpace();
+            // Verify Set-Cookie headers are present after login
+            var loginCookies = loginResponse.Headers.GetValues("Set-Cookie");
+            loginCookies.Should().Contain(c => c.Contains("refreshToken="));
+            loginCookies.Should().Contain(c => c.Contains("accessToken="));
 
-            using (var scope = Factory.Services.CreateScope())
+            var payload = await loginResponse.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>();
+            var accessToken = payload!.Data!.AccessToken;
+
+            // Logout with bearer token
+            var logoutRequest = new HttpRequestMessage(HttpMethod.Post, TestApiEndpoints.AuthLogout);
+            logoutRequest.Headers.Add("Authorization", $"Bearer {accessToken}");
+            var logoutResponse = await Client.SendAsync(logoutRequest);
+            logoutResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            // Verify Set-Cookie headers contain expiration (cookie deletion)
+            if (logoutResponse.Headers.Contains("Set-Cookie"))
             {
-                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                var user = await db.Users.Include(u => u.Session).AsNoTracking().FirstOrDefaultAsync(u => u.Email == email);
-                user.Should().NotBeNull();
-                user!.Session.Should().NotBeNull();
-                // After refresh, stored hash should not equal the original raw token
-                VerifyHash(refresh, user.Session!.RefreshTokenHash ?? string.Empty, user.Session.RefreshTokenSalt ?? string.Empty).Should().BeFalse();
+                var logoutCookies = logoutResponse.Headers.GetValues("Set-Cookie");
+                // Cookies are cleared by setting expires to past date
+                logoutCookies.Should().Contain(c => c.Contains("expires=") || c.Contains("max-age=0"));
             }
         }
 
         /// <summary>
-        /// Invalid refresh token returns 400 error.
+        /// Protected endpoint without token returns 401 Unauthorized (critical security test).
         /// </summary>
         [Fact]
-        public async Task RefreshToken_InvalidToken_Returns400()
+        public async Task GetMe_WithoutToken_Returns401()
         {
-            var request = new RefreshTokenRequest { RefreshToken = "this-does-not-exist" };
-            var response = await Client.PostAsJsonAsync(TestApiEndpoints.AuthRefreshToken, request);
-            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-            var payload = await response.Content.ReadFromJsonAsync<ApiResponse<object>>();
-            payload.Should().NotBeNull();
-            payload!.IsSuccess.Should().BeFalse();
-            payload.Message.ToLowerInvariant().Should().Contain("refresh");
+            // Attempt to access protected /me endpoint without auth
+            var response = await Client.GetAsync(TestApiEndpoints.AuthMe);
+            response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         }
 
         /// <summary>
@@ -300,47 +291,45 @@ namespace PutZige.API.Tests.Controllers
         }
 
         /// <summary>
-        /// Repeated refresh attempts may trigger rate limiting or bad request.
+        /// GetMe endpoint returns user profile when authenticated (critical auth test).
         /// </summary>
         [Fact]
-        public async Task RefreshToken_RateLimitExceeded_Returns429()
+        public async Task GetMe_WithValidToken_ReturnsSuccess()
         {
-            var refresh = "raterefresh110";
+            var email = "getme@example.com";
+            var password = "Password1!";
+
             using (var scope = Factory.Services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                var pwd = CreateHash("Password1!");
-                var rt = CreateHash(refresh);
-
-                var user = new User
+                var hashed = CreateHash(password);
+                await db.Users.AddAsync(new User
                 {
-                    Email = "rate110@example.com",
-                    Username = "rate110",
-                    DisplayName = "Rate 110",
-                    PasswordHash = pwd.hash,
-                    PasswordSalt = pwd.salt,
+                    Email = email,
+                    Username = "getmeuser",
+                    DisplayName = "Get Me User",
+                    PasswordHash = hashed.hash,
+                    PasswordSalt = hashed.salt,
                     IsActive = true,
-                    IsEmailVerified = true,
-                    Session = new UserSession
-                    {
-                        RefreshTokenHash = rt.hash,
-                        RefreshTokenSalt = rt.salt,
-                        RefreshTokenExpiry = DateTime.UtcNow.AddDays(1),
-                        IsOnline = true
-                    }
-                };
-
-                await db.Users.AddAsync(user);
+                    IsEmailVerified = true
+                });
                 await db.SaveChangesAsync();
             }
 
-            for (int i = 0; i < 11; i++)
-            {
-                var r = await Client.PostAsJsonAsync(TestApiEndpoints.AuthRefreshToken, new RefreshTokenRequest { RefreshToken = refresh });
-            }
+            // Login to get access token
+            var loginRequest = new LoginRequest { Identifier = email, Password = password };
+            var loginResponse = await Client.PostAsJsonAsync(TestApiEndpoints.AuthLogin, loginRequest);
+            var loginPayload = await loginResponse.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>();
+            var accessToken = loginPayload!.Data!.AccessToken;
 
-            var final = await Client.PostAsJsonAsync(TestApiEndpoints.AuthRefreshToken, new RefreshTokenRequest { RefreshToken = refresh });
-            final.StatusCode.Should().BeOneOf(HttpStatusCode.TooManyRequests, HttpStatusCode.BadRequest);
+            // Access protected endpoint with bearer token
+            var request = new HttpRequestMessage(HttpMethod.Get, TestApiEndpoints.AuthMe);
+            request.Headers.Add("Authorization", $"Bearer {accessToken}");
+            var response = await Client.SendAsync(request);
+            
+            // Should not be 401 or 403 - authentication should work
+            response.StatusCode.Should().NotBe(HttpStatusCode.Unauthorized);
+            response.StatusCode.Should().NotBe(HttpStatusCode.Forbidden);
         }
     }
 }

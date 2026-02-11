@@ -30,6 +30,7 @@ namespace PutZige.API.Controllers
         /// </summary>
         [HttpPost]
         [EnableRateLimiting("api-general")]
+        [ProducesResponseType(StatusCodes.Status201Created)]
         public async Task<ActionResult<ApiResponse<SendMessageResponse>>> SendMessage(
             [FromBody] SendMessageRequest request,
             CancellationToken ct)
@@ -39,7 +40,7 @@ namespace PutZige.API.Controllers
                 request.MessageText,
                 ct);
 
-            return Success(response, ResponseCodes.MESSAGE_SENT, SuccessMessages.Messaging.MessageSent);
+            return Created(response, ResponseCodes.MESSAGE_SENT, SuccessMessages.Messaging.MessageSent);
         }
 
         /// <summary>

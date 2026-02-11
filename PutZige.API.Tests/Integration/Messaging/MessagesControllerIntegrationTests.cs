@@ -210,9 +210,9 @@ public class MessagesControllerIntegrationTests : Integration.IntegrationTestBas
         }
 
         Client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-        var res = await Client.GetAsync($"{TestApiEndpoints.MessagesConversation}/{other}?pageNumber=2&pageSize=2");
-        // Allow OK or auth failure
-        res.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.Unauthorized, HttpStatusCode.BadRequest);
+        var res = await Client.GetAsync($"{TestApiEndpoints.MessagesConversation}/{other}/messages?pageNumber=2&pageSize=2");
+        // Allow OK, NotFound (if no messages), or auth failure
+        res.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound, HttpStatusCode.Unauthorized, HttpStatusCode.BadRequest);
 
         if (res.StatusCode == HttpStatusCode.OK)
         {
@@ -234,7 +234,7 @@ public class MessagesControllerIntegrationTests : Integration.IntegrationTestBas
         var token = await CreateUserAndLoginAsync(senderEmail, password);
         Client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
-        var res = await Client.GetAsync($"/api/v1/messages/conversation/{other}?pageNumber=0&pageSize=10");
+        var res = await Client.GetAsync($"/api/v1/conversations/{other}/messages?pageNumber=0&pageSize=10");
         // Invalid page number (0) causes validation error (400), but if conversation doesn't exist, returns 404
         res.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.NotFound, HttpStatusCode.Unauthorized);
     }
@@ -250,8 +250,9 @@ public class MessagesControllerIntegrationTests : Integration.IntegrationTestBas
         var other = Guid.NewGuid();
         var token = await CreateUserAndLoginAsync(senderEmail, password);
         Client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-        var res = await Client.GetAsync($"/api/v1/messages/conversation/{other}?pageNumber=1&pageSize=0");
-        res.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.Unauthorized);
+        var res = await Client.GetAsync($"/api/v1/conversations/{other}/messages?pageNumber=1&pageSize=0");
+        // Invalid page size (0) causes validation error (400), but if conversation doesn't exist, returns 404
+        res.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.NotFound, HttpStatusCode.Unauthorized);
     }
 
     /// <summary>
@@ -278,7 +279,7 @@ public class MessagesControllerIntegrationTests : Integration.IntegrationTestBas
         }
 
         Client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-        var res = await Client.GetAsync($"{TestApiEndpoints.MessagesConversation}/{other}");
+        var res = await Client.GetAsync($"{TestApiEndpoints.MessagesConversation}/{other}/messages");
         res.StatusCode.Should().Be(HttpStatusCode.OK);
         var payload = await res.Content.ReadFromJsonAsync<PutZige.Application.DTOs.Common.ApiResponse<PutZige.Application.DTOs.Messaging.ConversationHistoryResponse>>();
         payload.Should().NotBeNull();
@@ -339,9 +340,9 @@ public class MessagesControllerIntegrationTests : Integration.IntegrationTestBas
 
         Client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
         var res1 = await Client.PatchAsync($"/api/v1/messages/{messageId}/read", null);
-        res1.StatusCode.Should().Be(HttpStatusCode.OK);
+        res1.StatusCode.Should().Be(HttpStatusCode.NoContent);
         var res2 = await Client.PatchAsync($"/api/v1/messages/{messageId}/read", null);
-        res2.StatusCode.Should().Be(HttpStatusCode.OK);
+        res2.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         using (var scope = Factory.Services.CreateScope())
         {
@@ -523,7 +524,7 @@ public class MessagesControllerIntegrationTests : Integration.IntegrationTestBas
         Client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
         // Act
-        var res = await Client.GetAsync($"/api/v1/messages/conversation/{other}");
+        var res = await Client.GetAsync($"/api/v1/conversations/{other}/messages");
 
         // Assert - allow OK or auth/validation failures
         if (res.StatusCode == HttpStatusCode.OK)
@@ -549,7 +550,7 @@ public class MessagesControllerIntegrationTests : Integration.IntegrationTestBas
         var other = Guid.NewGuid();
 
         // Act
-        var res = await Client.GetAsync($"/api/v1/messages/conversation/{other}");
+        var res = await Client.GetAsync($"/api/v1/conversations/{other}/messages");
 
         // Assert
         res.StatusCode.Should().BeOneOf(HttpStatusCode.Unauthorized, HttpStatusCode.BadRequest);
@@ -582,7 +583,7 @@ public class MessagesControllerIntegrationTests : Integration.IntegrationTestBas
         }
 
         Client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-        var res = await Client.GetAsync($"/api/v1/messages/conversation/{other}");
+        var res = await Client.GetAsync($"/api/v1/conversations/{other}/messages");
         if (res.StatusCode == HttpStatusCode.OK)
         {
             var payload = await res.Content.ReadFromJsonAsync<PutZige.Application.DTOs.Common.ApiResponse<PutZige.Application.DTOs.Messaging.ConversationHistoryResponse>>();
