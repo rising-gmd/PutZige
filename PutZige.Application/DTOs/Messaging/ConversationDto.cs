@@ -11,6 +11,6 @@ public sealed class ConversationDto
     public bool IsOnline { get; init; }
 
     public MessageDto? LastMessage { get; init; }
-    public int UnreadCount { get; init; }
+    public long UnreadCount { get; init; }
     public DateTime? LastActivity { get; init; }
 }

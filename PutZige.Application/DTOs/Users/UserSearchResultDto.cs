@@ -1,12 +1,9 @@
 #nullable enable
 using System;
 
-namespace PutZige.Domain.DTOs;
+namespace PutZige.Application.DTOs.Users;
 
-/// <summary>
-/// Lightweight user projection for search results.
-/// </summary>
-public sealed class UserSearchProjection
+public sealed class UserSearchResultDto
 {
     public Guid Id { get; set; }
     public string Username { get; set; } = string.Empty;

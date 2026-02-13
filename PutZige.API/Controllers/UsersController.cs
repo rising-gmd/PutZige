@@ -59,16 +59,49 @@ namespace PutZige.API.Controllers
         }
 
         /// <summary>
-        /// Searches for users by query string.
+        /// Search users by username, email, or display name.
         /// </summary>
         [HttpGet("search")]
-        [Authorize]
-        public async Task<ActionResult<ApiResponse<UserSearchResponse>>> Search(
+        [EnableRateLimiting("api-general")]
+        public async Task<ActionResult<ApiResponse<PutZige.Application.DTOs.Users.SearchUsersResponse>>> SearchUsers(
             [FromQuery] string query,
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 20,
             CancellationToken ct = default)
         {
-            var response = await _userService.SearchUsersAsync(query, ct);
+            var request = new PutZige.Application.DTOs.Users.SearchUsersRequest { Query = query, PageNumber = pageNumber, PageSize = pageSize };
+
+            var response = await _userService.SearchUsersAsync(request, ct);
+
             return Success(response, ResponseCodes.USERS_FOUND);
+        }
+
+        /// <summary>
+        /// Get recent contacts (users chatted with recently).
+        /// </summary>
+        [HttpGet("recent-contacts")]
+        [EnableRateLimiting("api-general")]
+        public async Task<ActionResult<ApiResponse<System.Collections.Generic.List<PutZige.Application.DTOs.Users.UserSearchResultDto>>>> GetRecentContacts(
+            [FromQuery] int limit = 10,
+            CancellationToken ct = default)
+        {
+            var contacts = await _userService.GetRecentContactsAsync(limit, ct);
+
+            return Success(contacts, ResponseCodes.CONVERSATIONS_RETRIEVED);
+        }
+
+        /// <summary>
+        /// Get suggested users (mutual contacts, etc).
+        /// </summary>
+        [HttpGet("suggestions")]
+        [EnableRateLimiting("api-general")]
+        public async Task<ActionResult<ApiResponse<System.Collections.Generic.List<PutZige.Application.DTOs.Users.UserSearchResultDto>>>> GetSuggestions(
+            [FromQuery] int limit = 10,
+            CancellationToken ct = default)
+        {
+            var suggestions = await _userService.GetSuggestedUsersAsync(limit, ct);
+
+            return Success(suggestions, ResponseCodes.CONVERSATIONS_RETRIEVED);
         }
     }
 }

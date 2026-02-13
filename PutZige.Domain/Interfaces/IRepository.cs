@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
-using System.Threading;
-using System.Threading.Tasks;
+using PutZige.Domain.Models;
 
 namespace PutZige.Domain.Interfaces
 {
@@ -71,5 +70,28 @@ namespace PutZige.Domain.Interfaces
         /// Permanently deletes an entity.
         /// </summary>
         void HardDelete(TEntity entity);
+
+        /// <summary>
+        /// Get paginated results with optional filtering and ordering.
+        /// </summary>
+        Task<PagedResult<TEntity>> GetPagedAsync(
+            int pageNumber,
+            int pageSize,
+            Expression<Func<TEntity, bool>>? filter = null,
+            Expression<Func<TEntity, object>>? orderBy = null,
+            bool ascending = true,
+            CancellationToken ct = default);
+
+        /// <summary>
+        /// Project entities to DTOs with pagination (performance optimized).
+        /// </summary>
+        Task<PagedResult<TResult>> GetPagedProjectionAsync<TResult>(
+            Expression<Func<TEntity, TResult>> selector,
+            int pageNumber,
+            int pageSize,
+            Expression<Func<TEntity, bool>>? filter = null,
+            Expression<Func<TEntity, object>>? orderBy = null,
+            bool ascending = true,
+            CancellationToken ct = default);
     }
 }

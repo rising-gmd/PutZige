@@ -75,6 +75,69 @@ public class Repository<TEntity> : IRepository<TEntity> where TEntity : BaseEnti
         await _dbSet.AddAsync(entity, ct).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Get paginated results with optional filtering and ordering.
+    /// </summary>
+    public virtual async Task<PutZige.Domain.Models.PagedResult<TEntity>> GetPagedAsync(
+        int pageNumber,
+        int pageSize,
+        Expression<Func<TEntity, bool>>? filter = null,
+        Expression<Func<TEntity, object>>? orderBy = null,
+        bool ascending = true,
+        CancellationToken ct = default)
+    {
+        IQueryable<TEntity> query = _dbSet.AsNoTracking();
+
+        if (filter != null)
+            query = query.Where(filter);
+
+        // Get total count BEFORE ordering/paging
+        var totalCount = await query.CountAsync(ct).ConfigureAwait(false);
+
+        // Apply ordering
+        if (orderBy != null)
+            query = ascending ? query.OrderBy(orderBy) : query.OrderByDescending(orderBy);
+
+        // Apply pagination
+        var items = await query
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return PutZige.Domain.Models.PagedResult<TEntity>.Create(items, pageNumber, pageSize, totalCount);
+    }
+
+    /// <summary>
+    /// Project entities to DTOs with pagination (performance optimized).
+    /// </summary>
+    public virtual async Task<PutZige.Domain.Models.PagedResult<TResult>> GetPagedProjectionAsync<TResult>(
+        Expression<Func<TEntity, TResult>> selector,
+        int pageNumber,
+        int pageSize,
+        Expression<Func<TEntity, bool>>? filter = null,
+        Expression<Func<TEntity, object>>? orderBy = null,
+        bool ascending = true,
+        CancellationToken ct = default)
+    {
+        IQueryable<TEntity> query = _dbSet.AsNoTracking();
+
+        if (filter != null)
+            query = query.Where(filter);
+
+        var totalCount = await query.CountAsync(ct).ConfigureAwait(false);
+
+        if (orderBy != null)
+            query = ascending ? query.OrderBy(orderBy) : query.OrderByDescending(orderBy);
+
+        var items = await query
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .Select(selector)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return PutZige.Domain.Models.PagedResult<TResult>.Create(items, pageNumber, pageSize, totalCount);
+    }
+
     /// <inheritdoc/>
     public virtual void Update(TEntity entity)
     {

@@ -1,18 +1,11 @@
-#nullable enable
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using PutZige.Application.Common.Constants;
 using PutZige.Application.Common.Messages;
 using PutZige.Application.DTOs.Auth;
 using PutZige.Application.DTOs.Common;
 using PutZige.Application.Interfaces;
-using PutZige.Application.Settings;
 
 namespace PutZige.API.Controllers
 {

@@ -14,6 +14,7 @@ using PutZige.Application.DTOs.Common;
 using PutZige.Application.Interfaces;
 using PutZige.Domain.Entities;
 using PutZige.Domain.Interfaces;
+using PutZige.Application.DTOs.Users;
 
 namespace PutZige.Application.Services
 {
@@ -61,11 +62,11 @@ namespace PutZige.Application.Services
         }
 
         /// <summary>
-        /// Searches for users by query string with validation and mapping.
+        /// Searches for users by query string (legacy, non-paged).
         /// </summary>
         public async Task<UserSearchResponse> SearchUsersAsync(string query, CancellationToken ct = default)
         {
-            // Validation logic moved from controller
+            // Validation logic
             if (string.IsNullOrWhiteSpace(query) || query.Length < 1)
             {
                 throw new AppException(ResponseCodes.VALIDATION_FAILED, "Query parameter is required and must be at least 1 character");
@@ -93,12 +94,11 @@ namespace PutZige.Application.Services
                 };
             }
 
-            // Mapping logic moved from controller
             var userDtos = results.Select(u => new UserSearchDto
             {
                 Id = u.Id,
                 Username = u.Username,
-                DisplayName = u.DisplayName,
+                DisplayName = u.DisplayName ?? string.Empty,
                 Email = u.Email,
                 JobTitle = u.JobTitle,
                 Bio = u.Bio,
@@ -110,6 +110,63 @@ namespace PutZige.Application.Services
                 Users = userDtos,
                 TotalCount = userDtos.Length
             };
+        }
+
+        /// <summary>
+        /// Searches for users by query string with pagination.
+        /// </summary>
+        public async Task<SearchUsersResponse> SearchUsersAsync(PutZige.Application.DTOs.Users.SearchUsersRequest request, CancellationToken ct = default)
+        {
+            if (request == null) throw new ArgumentNullException(nameof(request));
+            if (string.IsNullOrWhiteSpace(request.Query))
+                return new SearchUsersResponse { Users = new(), PageNumber = request.PageNumber, PageSize = request.PageSize };
+
+            var currentUserId = _currentUserService.GetUserId();
+
+            if (_dapperUserRepository == null)
+            {
+                return new SearchUsersResponse { Users = new(), PageNumber = request.PageNumber, PageSize = request.PageSize };
+            }
+
+            var result = await _dapperUserRepository.SearchUsersAsync(
+                request.Query,
+                currentUserId,
+                request.PageNumber,
+                request.PageSize,
+                ct).ConfigureAwait(false);
+
+            return new SearchUsersResponse
+            {
+                Users = result.Items.Select(p => _mapper.Map<PutZige.Application.DTOs.Users.UserSearchResultDto>(p)).ToList(),
+                TotalCount = (int)result.TotalCount,
+                PageNumber = result.PageNumber,
+                PageSize = result.PageSize,
+                TotalPages = result.TotalPages
+            };
+        }
+
+        public async Task<System.Collections.Generic.List<PutZige.Application.DTOs.Users.UserSearchResultDto>> GetRecentContactsAsync(int limit = 10, CancellationToken ct = default)
+        {
+            var currentUserId = _currentUserService.GetUserId();
+
+            if (_dapperUserRepository == null)
+                return new System.Collections.Generic.List<PutZige.Application.DTOs.Users.UserSearchResultDto>();
+
+            var projections = await _dapperUserRepository.GetRecentContactsAsync(currentUserId, limit, daysSince: 7, ct);
+
+            return projections.Select(p => _mapper.Map<PutZige.Application.DTOs.Users.UserSearchResultDto>(p)).ToList();
+        }
+
+        public async Task<System.Collections.Generic.List<PutZige.Application.DTOs.Users.UserSearchResultDto>> GetSuggestedUsersAsync(int limit = 10, CancellationToken ct = default)
+        {
+            var currentUserId = _currentUserService.GetUserId();
+
+            if (_dapperUserRepository == null)
+                return new System.Collections.Generic.List<PutZige.Application.DTOs.Users.UserSearchResultDto>();
+
+            var projections = await _dapperUserRepository.GetSuggestedUsersAsync(currentUserId, limit, ct);
+
+            return projections.Select(p => _mapper.Map<PutZige.Application.DTOs.Users.UserSearchResultDto>(p)).ToList();
         }
 
         /// <summary>

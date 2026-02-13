@@ -26,6 +26,7 @@ namespace PutZige.API.Extensions
         private const string RegistrationPolicyName = "registration";
         private const string EmailResendPolicyName = "email-resend";
         private const string GlobalPolicyName = "global-api";
+        private const string ApiGeneralPolicyName = "api-general";
 
         /// <summary>
         /// Register rate limiting services and configuration.
@@ -120,6 +121,15 @@ namespace PutZige.API.Extensions
                         {
                             PermitLimit = settings.EmailResend.PermitLimit,
                             Window = TimeSpan.FromSeconds(settings.EmailResend.WindowSeconds),
+                            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                            QueueLimit = 0
+                        }));
+
+                    options.AddPolicy(ApiGeneralPolicyName, httpContext =>
+                        RateLimitPartition.GetFixedWindowLimiter(GetPartitionKey(httpContext), _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = settings.GlobalApi.PermitLimit,
+                            Window = TimeSpan.FromSeconds(settings.GlobalApi.WindowSeconds),
                             QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                             QueueLimit = 0
                         }));

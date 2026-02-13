@@ -2,6 +2,7 @@
 using PutZige.Application.Common.Users;
 using PutZige.Application.DTOs.Auth;
 using PutZige.Application.DTOs.Common;
+using PutZige.Application.DTOs.Users;
 
 namespace PutZige.Application.Interfaces
 {
@@ -34,12 +35,32 @@ namespace PutZige.Application.Interfaces
 
         /// <summary>
         /// Searches for users by query string (username, email, or display name).
+        /// Legacy API kept for compatibility.
         /// </summary>
         /// <param name="query">Search query (minimum 1 character)</param>
         /// <param name="ct">Cancellation token</param>
         /// <returns>List of matching users with total count</returns>
-        /// <exception cref="AppException">When query is invalid</exception>
         Task<UserSearchResponse> SearchUsersAsync(string query, CancellationToken ct = default);
+
+        /// <summary>
+        /// Searches for users by query string (username, email, or display name).
+        /// New paginated API.
+        /// </summary>
+        Task<SearchUsersResponse> SearchUsersAsync(SearchUsersRequest request, CancellationToken ct = default);
+
+        /// <summary>
+        /// Get recent contacts for current user.
+        /// </summary>
+        Task<System.Collections.Generic.List<UserSearchResultDto>> GetRecentContactsAsync(
+            int limit = 10,
+            CancellationToken ct = default);
+
+        /// <summary>
+        /// Get suggested users for current user.
+        /// </summary>
+        Task<System.Collections.Generic.List<UserSearchResultDto>> GetSuggestedUsersAsync(
+            int limit = 10,
+            CancellationToken ct = default);
 
         /// <summary>
         /// Retrieves a user by email address.

@@ -46,6 +46,110 @@ namespace PutZige.Infrastructure.Repositories.Dapper
             }
         }
 
+        public async Task<System.Collections.Generic.IEnumerable<PutZige.Domain.DTOs.UserSearchProjection>> GetRecentContactsAsync(Guid userId, int limit, int daysSince, CancellationToken ct = default)
+        {
+            var conn = _context.GetOpenConnection();
+
+            try
+            {
+                var param = new { UserId = userId, Limit = limit, DaysSince = daysSince };
+
+                return await conn.QueryAsync<PutZige.Domain.DTOs.UserSearchProjection>(
+                    new CommandDefinition(UserQueries.RECENT_CONTACTS, param, cancellationToken: ct));
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("GetRecentContactsAsync canceled for user: {UserId}", userId);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GetRecentContactsAsync failed for user: {UserId}", userId);
+                throw;
+            }
+        }
+
+        public async Task<System.Collections.Generic.IEnumerable<PutZige.Domain.DTOs.UserSearchProjection>> GetSuggestedUsersAsync(Guid userId, int limit, CancellationToken ct = default)
+        {
+            var conn = _context.GetOpenConnection();
+
+            try
+            {
+                var param = new { UserId = userId, Limit = limit };
+
+                return await conn.QueryAsync<PutZige.Domain.DTOs.UserSearchProjection>(
+                    new CommandDefinition(UserQueries.SUGGESTED_USERS, param, cancellationToken: ct));
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("GetSuggestedUsersAsync canceled for user: {UserId}", userId);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GetSuggestedUsersAsync failed for user: {UserId}", userId);
+                return Array.Empty<PutZige.Domain.DTOs.UserSearchProjection>();
+            }
+        }
+        private const int DefaultDaysSince = 7;
+
+        public async Task<PutZige.Domain.Models.PagedResult<PutZige.Domain.DTOs.UserSearchProjection>> SearchUsersAsync(
+            string query,
+            Guid excludeUserId,
+            int pageNumber,
+            int pageSize,
+            CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+                return PutZige.Domain.Models.PagedResult<PutZige.Domain.DTOs.UserSearchProjection>.Empty(pageNumber, pageSize);
+
+            var conn = _context.GetOpenConnection();
+
+            try
+            {
+                var searchTerm = $"%{query}%";
+                var offset = (pageNumber - 1) * pageSize;
+
+                // Use centralized SQL from UserQueries
+                var countSql = UserQueries.SEARCH_USERS_PAGED_COUNT;
+                var dataSql = UserQueries.SEARCH_USERS_PAGED_DATA;
+
+                var param = new
+                {
+                    SearchTerm = searchTerm,
+                    Query = query,
+                    ExcludeUserId = excludeUserId,
+                    Offset = offset,
+                    PageSize = pageSize
+                };
+
+                // Execute in parallel
+                var countTask = conn.ExecuteScalarAsync<long>(
+                    new CommandDefinition(countSql, param, cancellationToken: ct));
+
+                var dataTask = conn.QueryAsync<PutZige.Domain.DTOs.UserSearchProjection>(
+                    new CommandDefinition(dataSql, param, cancellationToken: ct));
+
+                await Task.WhenAll(countTask, dataTask).ConfigureAwait(false);
+
+                return PutZige.Domain.Models.PagedResult<PutZige.Domain.DTOs.UserSearchProjection>.Create(
+                    dataTask.Result,
+                    pageNumber,
+                    pageSize,
+                    countTask.Result);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("SearchUsersAsync canceled for query {Query}", query);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "SearchUsersAsync failed for query: {Query}", query);
+                throw;
+            }
+        }
+
         public async Task<PutZige.Domain.DTOs.UserProfileProjection?> GetProfileByIdAsync(Guid id, CancellationToken ct = default)
         {
             if (id == Guid.Empty) return null;

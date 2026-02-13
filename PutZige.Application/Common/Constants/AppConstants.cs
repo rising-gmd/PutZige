@@ -1,4 +1,4 @@
-namespace PutZige.Application.Common.Constants
+﻿namespace PutZige.Application.Common.Constants
 {
     /// <summary>
     /// Application-wide constants. Never change these without version migration.
@@ -79,6 +79,7 @@ namespace PutZige.Application.Common.Constants
             public const int MaxMessageLength = 4000;
             public const int DefaultPageSize = 50;
             public const int MaxPageSize = 100;
+            public const int ConversationListLimit = 100;  // ← add this
         }
     }
 }

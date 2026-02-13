@@ -22,6 +22,7 @@ namespace PutZige.Domain.Entities
         public string? DisplayName { get; set; }
         public string? Bio { get; set; }
         public string? ProfilePictureUrl { get; set; }
+        public string? JobTitle { get; set; }
 
         // Password Reset
         public string? PasswordResetToken { get; set; }

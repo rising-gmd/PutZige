@@ -15,6 +15,9 @@ public class UserMappingProfile : Profile
         CreateMap<User, RegisterUserResponse>()
             .ForMember(dest => dest.UserId, opt => opt.MapFrom(src => src.Id));
 
+        // Dapper projection -> application DTO
+        CreateMap<PutZige.Domain.DTOs.UserSearchProjection, PutZige.Application.DTOs.Users.UserSearchResultDto>();
+
         // Additional mappings can be added here
     }
 }

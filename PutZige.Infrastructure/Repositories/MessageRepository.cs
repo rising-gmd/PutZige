@@ -1,13 +1,13 @@
 #nullable enable
-using Microsoft.EntityFrameworkCore;
-using PutZige.Domain.Entities;
-using PutZige.Domain.Interfaces;
-using PutZige.Infrastructure.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using PutZige.Domain.Entities;
+using PutZige.Domain.Interfaces;
+using PutZige.Infrastructure.Data;
 
 namespace PutZige.Infrastructure.Repositories;
 
@@ -17,28 +17,40 @@ public class MessageRepository : Repository<Message>, IMessageRepository
 
     public async Task<Message?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
-        return await _dbSet.Include(m => m.Sender).Include(m => m.Receiver).FirstOrDefaultAsync(m => m.Id == id, ct).ConfigureAwait(false);
+        return await _dbSet
+            .Include(m => m.Sender)
+            .Include(m => m.Receiver)
+            .FirstOrDefaultAsync(m => m.Id == id, ct)
+            .ConfigureAwait(false);
     }
 
-    public async Task<(IEnumerable<Message> Messages, int TotalCount)> GetConversationAsync(Guid userId, Guid otherUserId, int pageNumber, int pageSize, CancellationToken ct = default)
+    public async Task<(IEnumerable<Message> Messages, int TotalCount)> GetConversationAsync(
+        Guid userId,
+        Guid otherUserId,
+        int pageNumber,
+        int pageSize,
+        CancellationToken ct = default)
     {
         if (pageNumber <= 0) throw new ArgumentOutOfRangeException(nameof(pageNumber));
         if (pageSize <= 0) throw new ArgumentOutOfRangeException(nameof(pageSize));
 
-        // Base filtered query (no ordering) for count and to avoid reapplying expensive operations
-        var baseQuery = _dbSet.Where(m => (m.SenderId == userId && m.ReceiverId == otherUserId) || (m.SenderId == otherUserId && m.ReceiverId == userId));
+        // Single predicate reused for both count and data — avoids expressing
+        // the OR condition twice and ensures they stay in sync.
+        var baseQuery = _dbSet.Where(m =>
+            !m.IsDeleted &&
+            ((m.SenderId == userId && m.ReceiverId == otherUserId) ||
+             (m.SenderId == otherUserId && m.ReceiverId == userId)));
 
-        // Get total count without ordering for better performance
-        var totalCount = await baseQuery.CountAsync(ct).ConfigureAwait(false);
+        // Run count and data page in parallel — single connection, two commands.
+        var countTask = baseQuery.CountAsync(ct);
 
         var skip = (pageNumber - 1) * pageSize;
-
-        // Apply ordering and paging, use AsNoTracking to avoid change-tracking overhead for read-only queries
-        var pageQuery = baseQuery.OrderByDescending(m => m.SentAt).AsNoTracking();
-
-        var messages = await pageQuery
+        var dataTask = baseQuery
+            .OrderByDescending(m => m.SentAt)
+            .AsNoTracking()
             .Skip(skip)
             .Take(pageSize)
+            // Project to avoid loading all User columns — only what callers need.
             .Select(m => new Message
             {
                 Id = m.Id,
@@ -52,20 +64,22 @@ public class MessageRepository : Repository<Message>, IMessageRepository
                 Sender = new User { Id = m.SenderId, Username = m.Sender != null ? m.Sender.Username : string.Empty },
                 Receiver = new User { Id = m.ReceiverId, Username = m.Receiver != null ? m.Receiver.Username : string.Empty }
             })
-            .ToListAsync(ct).ConfigureAwait(false);
+            .ToListAsync(ct);
 
-        return (messages, totalCount);
+        await Task.WhenAll(countTask, dataTask).ConfigureAwait(false);
+
+        return (dataTask.Result, countTask.Result);
     }
 
     public async Task AddAsync(Message message, CancellationToken ct = default)
     {
-        if (message is null) throw new ArgumentNullException(nameof(message));
+        ArgumentNullException.ThrowIfNull(message);
         await _dbSet.AddAsync(message, ct).ConfigureAwait(false);
     }
 
     public Task UpdateAsync(Message message, CancellationToken ct = default)
     {
-        if (message is null) throw new ArgumentNullException(nameof(message));
+        ArgumentNullException.ThrowIfNull(message);
         _dbSet.Update(message);
         return Task.CompletedTask;
     }
