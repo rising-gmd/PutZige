@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using PutZige.Application.Interfaces;
+using PutZige.Application.Common.Constants;
 using PutZige.Domain.Interfaces;
 using System;
 using System.Security.Claims;
@@ -46,7 +47,7 @@ public class ChatHub : Hub
 
             _logger?.LogInformation("User connected - UserId: {UserId}, ConnectionId: {ConnectionId}", userId.Value, Context.ConnectionId);
 
-            await Clients.All.SendAsync(PutZige.Application.Common.Constants.SignalRConstants.Events.UserOnline, new { UserId = userId.Value, IsOnline = true, LastSeen = DateTime.UtcNow });
+            await Clients.All.SendAsync(SignalRConstants.Events.UserOnline, new { UserId = userId.Value, IsOnline = true, LastSeen = DateTime.UtcNow });
 
             await base.OnConnectedAsync();
         }
@@ -69,7 +70,7 @@ public class ChatHub : Hub
 
                 _logger?.LogInformation("User disconnected - UserId: {UserId}, ConnectionId: {ConnectionId}", userId.Value, Context.ConnectionId);
 
-                await Clients.All.SendAsync(PutZige.Application.Common.Constants.SignalRConstants.Events.UserOffline, new { UserId = userId.Value, IsOnline = false, LastSeen = DateTime.UtcNow });
+                await Clients.All.SendAsync(SignalRConstants.Events.UserOffline, new { UserId = userId.Value, IsOnline = false, LastSeen = DateTime.UtcNow });
             }
         }
         catch (Exception ex)
@@ -98,7 +99,7 @@ public class ChatHub : Hub
 
                     if (_connectionMapping.TryGetConnection(participant.UserId, out var connectionId))
                     {
-                        await Clients.Client(connectionId).SendAsync(PutZige.Application.Common.Constants.SignalRConstants.Events.ReceiveMessage, response, ct).ConfigureAwait(false);
+                        await Clients.Client(connectionId).SendAsync(SignalRConstants.Events.ReceiveMessage, response, ct).ConfigureAwait(false);
                         try
                         {
                             await _messagingService.MarkMessageAsDeliveredAsync(response.MessageId, ct).ConfigureAwait(false);
@@ -111,7 +112,7 @@ public class ChatHub : Hub
                 }
             }
 
-            await Clients.Caller.SendAsync(PutZige.Application.Common.Constants.SignalRConstants.Events.MessageSent, response, ct).ConfigureAwait(false);
+            await Clients.Caller.SendAsync(SignalRConstants.Events.MessageSent, response, ct).ConfigureAwait(false);
         }
         catch (KeyNotFoundException ex)
         {
@@ -126,7 +127,7 @@ public class ChatHub : Hub
         catch (UnauthorizedAccessException ex)
         {
             _logger?.LogWarning(ex, "Unauthorized access - ConnectionId: {ConnectionId}", Context.ConnectionId);
-            throw new HubException(PutZige.Application.Common.Constants.SignalRConstants.ErrorMessages.Unauthorized);
+            throw new HubException(SignalRConstants.ErrorMessages.Unauthorized);
         }
         catch (Exception ex)
         {
@@ -146,7 +147,7 @@ public class ChatHub : Hub
         {
             if (participant.UserId == senderId) continue;
             if (_connectionMapping.TryGetConnection(participant.UserId, out var connectionId))
-                await Clients.Client(connectionId).SendAsync(PutZige.Application.Common.Constants.SignalRConstants.Events.UserTyping, new { UserId = senderId, ConversationId = conversationId }, ct).ConfigureAwait(false);
+                await Clients.Client(connectionId).SendAsync(SignalRConstants.Events.UserTyping, new { UserId = senderId, ConversationId = conversationId }, ct).ConfigureAwait(false);
         }
     }
 
@@ -161,20 +162,20 @@ public class ChatHub : Hub
         {
             if (participant.UserId == senderId) continue;
             if (_connectionMapping.TryGetConnection(participant.UserId, out var connectionId))
-                await Clients.Client(connectionId).SendAsync(PutZige.Application.Common.Constants.SignalRConstants.Events.UserStoppedTyping, new { UserId = senderId, ConversationId = conversationId }, ct).ConfigureAwait(false);
+                await Clients.Client(connectionId).SendAsync(SignalRConstants.Events.UserStoppedTyping, new { UserId = senderId, ConversationId = conversationId }, ct).ConfigureAwait(false);
         }
     }
 
     public async Task NotifyMessageDelivered(Guid messageId, Guid receiverId, DateTime deliveredAt)
     {
-        if (_connectionMapping.TryGetConnection(receiverId, out var connectionId))
-            await Clients.Client(connectionId).SendAsync(PutZige.Application.Common.Constants.SignalRConstants.Events.MessageDelivered, new { MessageId = messageId, DeliveredAt = deliveredAt }).ConfigureAwait(false);
+            if (_connectionMapping.TryGetConnection(receiverId, out var connectionId))
+            await Clients.Client(connectionId).SendAsync(SignalRConstants.Events.MessageDelivered, new { MessageId = messageId, DeliveredAt = deliveredAt }).ConfigureAwait(false);
     }
 
     public async Task NotifyMessageRead(Guid messageId, Guid senderId, DateTime readAt)
     {
         if (_connectionMapping.TryGetConnection(senderId, out var connectionId))
-            await Clients.Client(connectionId).SendAsync(PutZige.Application.Common.Constants.SignalRConstants.Events.MessageRead, new { MessageId = messageId, ReadAt = readAt }).ConfigureAwait(false);
+            await Clients.Client(connectionId).SendAsync(SignalRConstants.Events.MessageRead, new { MessageId = messageId, ReadAt = readAt }).ConfigureAwait(false);
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────
@@ -189,6 +190,6 @@ public class ChatHub : Hub
 
     private Guid GetCurrentUserId()
     {
-        return GetUserIdFromContext() ?? throw new HubException(PutZige.Application.Common.Constants.SignalRConstants.ErrorMessages.Unauthorized);
+        return GetUserIdFromContext() ?? throw new HubException(SignalRConstants.ErrorMessages.Unauthorized);
     }
 }

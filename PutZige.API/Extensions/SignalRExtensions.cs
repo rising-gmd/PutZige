@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Builder;
 using PutZige.Infrastructure.Settings;
 using PutZige.API.Hubs;
+using PutZige.Application.Common.Constants;
 
 namespace PutZige.API.Extensions;
 
@@ -30,6 +31,6 @@ public static class SignalRExtensions
 
     public static void MapSignalRHubs(this WebApplication app)
     {
-        app.MapHub<ChatHub>(PutZige.Application.Common.Constants.SignalRConstants.HubRoute);
+        app.MapHub<ChatHub>(SignalRConstants.HubRoute);
     }
 }

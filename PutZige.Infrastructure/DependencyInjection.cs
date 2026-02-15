@@ -72,7 +72,7 @@ public static class DependencyInjection
         services.AddScoped<IConversationRepository, ConversationRepository>();
 
         // JWT settings and token service
-        services.Configure<PutZige.Application.Settings.JwtSettings>(configuration.GetSection(PutZige.Application.Settings.JwtSettings.SectionName));
+        services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
 
         // Client info service (depends on IHttpContextAccessor which is provided by the host)
@@ -103,7 +103,7 @@ public static class DependencyInjection
         // Dapper context and repositories
         services.AddScoped<DapperContext>();
         services.AddScoped<IDapperUserRepository, DapperUserRepository>();
-        services.AddScoped<PutZige.Domain.Interfaces.IDapperMessageRepository, PutZige.Infrastructure.Repositories.Dapper.DapperMessageRepository>();
+        services.AddScoped<IDapperMessageRepository, DapperMessageRepository>();
 
         // Register Hangfire background service types
         services.AddScoped<EmailBackgroundService>();
