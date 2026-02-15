@@ -53,6 +53,18 @@ namespace PutZige.Infrastructure.Data.Configurations
             builder.HasIndex(m => new { m.ReceiverId, m.DeliveredAt })
                 .HasDatabaseName("IX_Messages_DeliveryStatus")
                 .HasFilter("[DeliveredAt] IS NULL AND [IsDeleted] = 0");
+
+            // ADD: Foreign key to Conversation (nullable during migration)
+            builder.HasOne(m => m.Conversation)
+                .WithMany(c => c.Messages)
+                .HasForeignKey(m => m.ConversationId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // ADD: Index for conversation messages
+            builder.HasIndex(m => new { m.ConversationId, m.SentAt })
+                .HasDatabaseName("IX_Messages_ConversationId_SentAt")
+                .IsDescending(false, true)
+                .HasFilter("[IsDeleted] = 0");
         }
     }
 }

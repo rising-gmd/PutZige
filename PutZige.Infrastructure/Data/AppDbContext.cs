@@ -32,6 +32,16 @@ public class AppDbContext : DbContext
     public DbSet<Message> Messages => Set<Message>();
 
     /// <summary>
+    /// Conversations table set.
+    /// </summary>
+    public DbSet<Conversation> Conversations => Set<Conversation>();
+
+    /// <summary>
+    /// Conversation participants table set.
+    /// </summary>
+    public DbSet<ConversationParticipant> ConversationParticipants => Set<ConversationParticipant>();
+
+    /// <summary>
     /// User settings table set.
     /// </summary>
     public DbSet<UserSettings> UserSettings => Set<UserSettings>();

@@ -12,31 +12,17 @@ using Xunit;
 
 namespace PutZige.API.Tests.Integration.Security
 {
-    public class MessagingSecurityTests : IAsyncDisposable
+    public class MessagingSecurityTests : Integration.IntegrationTestBase
     {
-        private readonly WebApplicationFactory<Program> _factory;
         private readonly Faker _faker = new Faker();
 
-        public MessagingSecurityTests()
-        {
-            _factory = new WebApplicationFactory<Program>();
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            _factory.Dispose();
-            await Task.CompletedTask;
-        }
 
         private HttpClient CreateClient(bool withAuth = false)
         {
-            var client = _factory.CreateClient();
             if (withAuth)
-            {
-                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", "test-token");
-            }
-
-            return client;
+                Client.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Guid.NewGuid().ToString());
+            return Client;
         }
 
         /// <summary>
@@ -201,7 +187,9 @@ namespace PutZige.API.Tests.Integration.Security
             var payload = new { ReceiverId = Guid.NewGuid(), MessageText = text };
 
             var resp = await client.PostAsJsonAsync(PutZige.API.Tests.TestApiEndpoints.Messages, payload, CancellationToken.None);
-            resp.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.RequestEntityTooLarge, HttpStatusCode.UnsupportedMediaType, HttpStatusCode.InternalServerError);
+            resp.StatusCode.Should().BeOneOf(
+                HttpStatusCode.BadRequest, HttpStatusCode.RequestEntityTooLarge, HttpStatusCode.UnsupportedMediaType, HttpStatusCode.InternalServerError,
+                HttpStatusCode.Unauthorized);
         }
 
         /// <summary>

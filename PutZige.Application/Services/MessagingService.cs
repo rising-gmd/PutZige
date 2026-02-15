@@ -21,6 +21,7 @@ namespace PutZige.Application.Services
         private readonly IDapperMessageRepository _dapperMessageRepository;
         private readonly IMessageRepository _messageRepository;
         private readonly IUserRepository _userRepository;
+        private readonly IConversationRepository _conversationRepository;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly ILogger<MessagingService> _logger;
@@ -32,6 +33,7 @@ namespace PutZige.Application.Services
             IDapperMessageRepository dapperMessageRepository,
             IMessageRepository messageRepository,
             IUserRepository userRepository,
+            IConversationRepository conversationRepository,
             IUnitOfWork unitOfWork,
             IMapper mapper,
             IRealTimeNotifier realTimeNotifier,
@@ -42,6 +44,7 @@ namespace PutZige.Application.Services
             _dapperMessageRepository = dapperMessageRepository ?? throw new ArgumentNullException(nameof(dapperMessageRepository));
             _messageRepository = messageRepository ?? throw new ArgumentNullException(nameof(messageRepository));
             _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
+            _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
             _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
             _realTimeNotifier = realTimeNotifier ?? throw new ArgumentNullException(nameof(realTimeNotifier));
@@ -64,6 +67,7 @@ namespace PutZige.Application.Services
                 .Select(p => new ConversationDto
                 {
                     UserId = p.UserId,
+                    ConversationId = p.ConversationId,
                     Username = p.Username,
                     DisplayName = p.DisplayName,
                     ProfilePictureUrl = p.ProfilePictureUrl,
@@ -84,17 +88,27 @@ namespace PutZige.Application.Services
         // ── Send message ─────────────────────────────────────────────────────
 
         public async Task<SendMessageResponse> SendMessageAsync(
-            Guid receiverId,
+            Guid conversationId,
             string messageText,
+            Guid senderId,
             CancellationToken ct = default)
         {
-            var senderId = _currentUserService.GetUserId();
+            // Get conversation and verify sender is participant
+            var conversation = await _conversationRepository.GetByIdWithParticipantsAsync(conversationId, ct).ConfigureAwait(false);
+            if (conversation == null)
+                throw new KeyNotFoundException("Conversation not found");
+
+            if (!conversation.Participants.Any(p => p.UserId == senderId))
+                throw new UnauthorizedAccessException("Not a participant");
+
+            // For direct conversations, receiver is the other participant
+            var receiverId = conversation.Participants.First(p => p.UserId != senderId).UserId;
 
             ValidateMessageRequest(senderId, receiverId, messageText);
-            await ValidateUsersExistAsync(senderId, receiverId, ct).ConfigureAwait(false);
 
             var message = new Message
             {
+                ConversationId = conversationId,
                 SenderId = senderId,
                 ReceiverId = receiverId,
                 MessageText = messageText,
@@ -102,29 +116,41 @@ namespace PutZige.Application.Services
             };
 
             await _messageRepository.AddAsync(message, ct).ConfigureAwait(false);
+
+            // Update conversation LastActivity
+            conversation.LastActivity = message.SentAt;
+            _conversationRepository.Update(conversation);
+
             await _unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
 
             _logger.LogInformation(
-                "Message sent - MessageId: {MessageId} SenderId: {SenderId} ReceiverId: {ReceiverId}",
-                message.Id, senderId, receiverId);
+                "Message sent - MessageId: {MessageId} ConversationId: {ConversationId}",
+                message.Id, conversationId);
 
             return _mapper.Map<SendMessageResponse>(message);
         }
 
+        // SendMessageAsAsync removed: use SendMessageAsync (use current user) and let callers pass conversationId
+
         // ── Conversation history ─────────────────────────────────────────────
 
         public async Task<ConversationHistoryResponse> GetConversationHistoryAsync(
-            Guid otherUserId,
+            Guid conversationId,
             int pageNumber,
             int pageSize,
             CancellationToken ct = default)
         {
             var userId = _currentUserService.GetUserId();
 
-            ValidateConversationHistoryRequest(otherUserId, pageNumber, pageSize);
+            // Verify user is participant
+            var conversation = await _conversationRepository.GetByIdWithParticipantsAsync(conversationId, ct).ConfigureAwait(false);
+            if (conversation == null || !conversation.Participants.Any(p => p.UserId == userId))
+                throw new UnauthorizedAccessException("Not authorized");
+
+            ValidateConversationHistoryRequest(conversationId, pageNumber, pageSize);
 
             var (projections, totalCount) = await _dapperMessageRepository
-                .GetConversationHistoryAsync(userId, otherUserId, pageNumber, pageSize, ct)
+                .GetConversationHistoryAsync(conversationId, pageNumber, pageSize, ct)
                 .ConfigureAwait(false);
 
             var messageDtos = projections

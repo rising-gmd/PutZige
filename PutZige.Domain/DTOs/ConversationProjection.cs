@@ -29,6 +29,8 @@ namespace PutZige.Domain.DTOs
         public DateTime? LastMessageReadAt { get; init; }
 
         // ── Metadata ─────────────────────────────────────────────────────────
+        // Conversation identifier for explicit conversation model
+        public Guid ConversationId { get; init; }
         public long UnreadCount { get; init; }
         public DateTime LastActivity { get; init; }
     }

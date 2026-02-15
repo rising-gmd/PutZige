@@ -58,5 +58,6 @@ namespace PutZige.Application.Common.Constants
         public const string USERS_FOUND = "USERS_FOUND";
         public const string CONVERSATIONS_RETRIEVED = "CONVERSATIONS_RETRIEVED";
         public const string MESSAGE_MARKED_AS_READ = "MESSAGE_MARKED_AS_READ";
+        public const string CONVERSATION_CREATED = "CONVERSATION_CREATED";
     }
 }

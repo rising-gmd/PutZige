@@ -69,6 +69,7 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IMessageRepository, MessageRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<IConversationRepository, ConversationRepository>();
 
         // JWT settings and token service
         services.Configure<PutZige.Application.Settings.JwtSettings>(configuration.GetSection(PutZige.Application.Settings.JwtSettings.SectionName));

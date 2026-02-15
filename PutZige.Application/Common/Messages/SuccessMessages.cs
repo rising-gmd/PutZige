@@ -25,6 +25,7 @@ namespace PutZige.Application.Common.Messages
         {
             public const string MessageSent = "Message sent successfully";
             public const string MessageMarkedAsRead = "Message marked as read";
+            public const string ConversationCreated = "Conversation created successfully";
         }
 
         public static class UserProfile

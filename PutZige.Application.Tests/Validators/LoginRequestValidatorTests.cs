@@ -39,12 +39,14 @@ namespace PutZige.Application.Tests.Validators
         /// Invalid email format fails validation.
         /// </summary>
         [Fact]
-        public async Task Validate_InvalidEmailFormat_FailsValidation()
+        public async Task Validate_EmptyIdentifier_FailsValidation()
         {
-            var model = new LoginRequest { Identifier = "not-email", Password = "Password1!" };
+            // Identifier accepts email OR username - "not-email" is a valid username format
+            // To test invalid input, use something that fails both formats
+            var model = new LoginRequest { Identifier = "", Password = "Password1!" };
             var result = await _validator.ValidateAsync(model);
             result.IsValid.Should().BeFalse();
-            result.Errors.Should().Contain(e => e.PropertyName.Equals("identifier", System.StringComparison.OrdinalIgnoreCase));
+            result.Errors.Should().Contain(e => e.PropertyName.Equals("identifier", StringComparison.OrdinalIgnoreCase));
         }
 
         /// <summary>

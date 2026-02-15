@@ -35,7 +35,9 @@ namespace PutZige.Application.Tests.Services
             var mockNotifier = new Mock<IRealTimeNotifier>();
             mockNotifier.Setup(n => n.TryNotifyMessageDeliveredAsync(message.SenderId, messageId, It.IsAny<DateTime>())).Returns(Task.CompletedTask).Verifiable();
 
-            var svc = new MessagingService(mockMsgRepo.Object, mockUserRepo.Object, mockUow.Object, mockMapper.Object, mockNotifier.Object, new Mock<PutZige.Application.Interfaces.ICurrentUserService>().Object, new Mock<PutZige.Application.Interfaces.IDateTimeProvider>().Object, Mock.Of<ILogger<MessagingService>>());
+            var mockDapper = new Mock<PutZige.Domain.Interfaces.IDapperMessageRepository>();
+            var mockConvRepo = new Mock<IConversationRepository>();
+            var svc = new MessagingService(mockDapper.Object, mockMsgRepo.Object, mockUserRepo.Object, mockConvRepo.Object, mockUow.Object, mockMapper.Object, mockNotifier.Object, new Mock<PutZige.Application.Interfaces.ICurrentUserService>().Object, new Mock<PutZige.Application.Interfaces.IDateTimeProvider>().Object, Mock.Of<ILogger<MessagingService>>());
 
             await svc.MarkMessageAsDeliveredAsync(messageId);
 
@@ -61,7 +63,9 @@ namespace PutZige.Application.Tests.Services
             var mockNotifier = new Mock<IRealTimeNotifier>();
             mockNotifier.Setup(n => n.TryNotifyMessageReadAsync(message.SenderId, messageId, It.IsAny<DateTime>())).Returns(Task.CompletedTask).Verifiable();
 
-            var svc = new MessagingService(mockMsgRepo.Object, mockUserRepo.Object, mockUow.Object, mockMapper.Object, mockNotifier.Object, new Mock<PutZige.Application.Interfaces.ICurrentUserService>().Object, new Mock<PutZige.Application.Interfaces.IDateTimeProvider>().Object, Mock.Of<ILogger<MessagingService>>());
+            var mockDapper2 = new Mock<PutZige.Domain.Interfaces.IDapperMessageRepository>();
+            var mockConvRepo2 = new Mock<IConversationRepository>();
+            var svc = new MessagingService(mockDapper2.Object, mockMsgRepo.Object, mockUserRepo.Object, mockConvRepo2.Object, mockUow.Object, mockMapper.Object, mockNotifier.Object, new Mock<PutZige.Application.Interfaces.ICurrentUserService>().Object, new Mock<PutZige.Application.Interfaces.IDateTimeProvider>().Object, Mock.Of<ILogger<MessagingService>>());
 
             await svc.MarkMessageAsReadAsync(messageId);
 

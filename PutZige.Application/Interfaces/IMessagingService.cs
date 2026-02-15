@@ -20,7 +20,7 @@ namespace PutZige.Application.Interfaces
         /// <returns>Sent message details</returns>
         /// <exception cref="AppException">When validation fails or users not found</exception>
         /// <exception cref="KeyNotFoundException">When sender or receiver not found</exception>
-        Task<SendMessageResponse> SendMessageAsync(Guid receiverId, string messageText, CancellationToken ct = default);
+        Task<SendMessageResponse> SendMessageAsync(Guid conversationId, string messageText, Guid senderId, CancellationToken ct = default);
 
         /// <summary>
         /// Retrieves paginated message history between the current user and another user.
@@ -32,7 +32,7 @@ namespace PutZige.Application.Interfaces
         /// <returns>Paginated conversation history</returns>
         /// <exception cref="AppException">When validation fails</exception>
         /// <exception cref="ArgumentOutOfRangeException">When page parameters invalid</exception>
-        Task<ConversationHistoryResponse> GetConversationHistoryAsync(Guid otherUserId, int pageNumber, int pageSize, CancellationToken ct = default);
+        Task<ConversationHistoryResponse> GetConversationHistoryAsync(Guid conversationId, int pageNumber, int pageSize, CancellationToken ct = default);
 
         /// <summary>
         /// Retrieves all conversations for the current authenticated user.

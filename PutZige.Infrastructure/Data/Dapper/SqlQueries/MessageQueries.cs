@@ -46,6 +46,7 @@ public static class MessageQueries
             GROUP BY SenderId
         )
         SELECT TOP (@Limit)
+            c.Id AS ConversationId,
             u.Id AS UserId,
             u.Username,
             u.DisplayName,
@@ -61,11 +62,47 @@ public static class MessageQueries
             ISNULL(uc.UnreadCount, 0) AS UnreadCount,
             lm.SentAt AS LastActivity
         FROM latest_messages lm
+        INNER JOIN Conversations c WITH (NOLOCK)
+            ON c.IsDeleted = 0
+            AND c.IsGroup = 0
+            AND EXISTS (
+                SELECT 1 FROM ConversationParticipants cp
+                WHERE cp.ConversationId = c.Id
+                  AND cp.UserId = @UserId
+                  AND cp.IsDeleted = 0
+            )
+            AND EXISTS (
+                SELECT 1 FROM ConversationParticipants cp
+                WHERE cp.ConversationId = c.Id
+                  AND cp.UserId = lm.OtherUserId
+                  AND cp.IsDeleted = 0
+            )
         INNER JOIN Users u WITH (NOLOCK) ON u.Id = lm.OtherUserId AND u.IsDeleted = 0
         LEFT JOIN UserSessions us WITH (NOLOCK) ON us.UserId = u.Id
         LEFT JOIN unread_counts uc ON uc.FromUser = u.Id
         ORDER BY lm.SentAt DESC
         OPTION (RECOMPILE);";
+
+    // New: Get conversation history by ConversationId
+    public const string GET_CONVERSATION_HISTORY_BY_ID =
+        @"SELECT 
+            m.Id, m.SenderId, m.ReceiverId, m.MessageText,
+            m.SentAt, m.DeliveredAt, m.ReadAt,
+            s.Username AS SenderUsername,
+            r.Username AS ReceiverUsername
+        FROM Messages m WITH (INDEX(IX_Messages_ConversationId_SentAt))
+        INNER JOIN Users s WITH (NOLOCK) ON s.Id = m.SenderId
+        INNER JOIN Users r WITH (NOLOCK) ON r.Id = m.ReceiverId
+        WHERE m.ConversationId = @ConversationId
+          AND m.IsDeleted = 0
+        ORDER BY m.SentAt DESC
+        OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
+
+    public const string GET_CONVERSATION_COUNT_BY_ID =
+        @"SELECT COUNT_BIG(*)
+        FROM Messages WITH (INDEX(IX_Messages_ConversationId_SentAt))
+        WHERE ConversationId = @ConversationId
+          AND IsDeleted = 0;";
 
     /// <summary>
     /// Get paginated conversation history between two users.

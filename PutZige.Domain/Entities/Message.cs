@@ -13,6 +13,10 @@ namespace PutZige.Domain.Entities
         public DateTime? DeliveredAt { get; set; }
         public DateTime? ReadAt { get; set; }
 
+    // Conversation support (nullable during migration)
+    public Guid? ConversationId { get; set; }
+    public Conversation? Conversation { get; set; }
+
         public User? Sender { get; set; }
         public User? Receiver { get; set; }
     }

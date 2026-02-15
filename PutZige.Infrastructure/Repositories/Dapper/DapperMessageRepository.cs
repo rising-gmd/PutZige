@@ -29,6 +29,8 @@ namespace PutZige.Infrastructure.Repositories.Dapper
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
+        // legacy user-to-user overload removed
+
         public async Task<IEnumerable<ConversationProjection>> GetConversationsForUserAsync(Guid userId, int limit, CancellationToken ct = default)
         {
             if (userId == Guid.Empty) return Array.Empty<ConversationProjection>();
@@ -56,13 +58,12 @@ namespace PutZige.Infrastructure.Repositories.Dapper
         }
 
         public async Task<(IEnumerable<MessageProjection> Messages, long TotalCount)> GetConversationHistoryAsync(
-            Guid userId,
-            Guid otherUserId,
+            Guid conversationId,
             int pageNumber,
             int pageSize,
             CancellationToken ct = default)
         {
-            if (userId == Guid.Empty || otherUserId == Guid.Empty)
+            if (conversationId == Guid.Empty)
                 return (Array.Empty<MessageProjection>(), 0);
 
             var conn = _context.GetOpenConnection();
@@ -70,14 +71,13 @@ namespace PutZige.Infrastructure.Repositories.Dapper
             try
             {
                 var offset = (pageNumber - 1) * pageSize;
-                var param = new { UserId = userId, OtherUserId = otherUserId, Offset = offset, PageSize = pageSize };
+                var param = new { ConversationId = conversationId, Offset = offset, PageSize = pageSize };
 
-                // Execute both queries in parallel for better performance
                 var messagesTask = conn.QueryAsync<MessageProjection>(
-                    new CommandDefinition(MessageQueries.GET_CONVERSATION_HISTORY, param, cancellationToken: ct));
+                    new CommandDefinition(MessageQueries.GET_CONVERSATION_HISTORY_BY_ID, param, cancellationToken: ct));
                 
                 var countTask = conn.ExecuteScalarAsync<long>(
-                    new CommandDefinition(MessageQueries.GET_CONVERSATION_COUNT, param, cancellationToken: ct));
+                    new CommandDefinition(MessageQueries.GET_CONVERSATION_COUNT_BY_ID, param, cancellationToken: ct));
 
                 await Task.WhenAll(messagesTask, countTask).ConfigureAwait(false);
 
@@ -85,12 +85,12 @@ namespace PutZige.Infrastructure.Repositories.Dapper
             }
             catch (OperationCanceledException)
             {
-                _logger.LogWarning("GetConversationHistoryAsync canceled for users {UserId} - {OtherUserId}", userId, otherUserId);
+                _logger.LogWarning("GetConversationHistoryAsync canceled for conversation {ConversationId}", conversationId);
                 throw;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "GetConversationHistoryAsync failed for users {UserId} - {OtherUserId}", userId, otherUserId);
+                _logger.LogError(ex, "GetConversationHistoryAsync failed for conversation {ConversationId}", conversationId);
                 throw;
             }
         }

@@ -17,7 +17,7 @@ namespace PutZige.API.Tests
         public const string Health = "/api/v1/health";
 
         // SignalR hubs
-        public const string ChatHub = "/hubs/chat";
+        public const string ChatHub = "/api/v1/hubs/chat";
 
         // Messages endpoints
         public const string Messages = "/api/v1/messages";

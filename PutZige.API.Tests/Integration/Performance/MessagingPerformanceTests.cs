@@ -1,4 +1,12 @@
 #nullable enable
+using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using PutZige.Application.DTOs.Messaging;
+using PutZige.Application.Interfaces;
+using PutZige.Domain.Entities;
+using PutZige.Domain.Interfaces;
+using PutZige.Infrastructure.Data;
 using System;
 using System.Diagnostics;
 using System.Linq;
@@ -6,13 +14,6 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading.Tasks;
-using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using PutZige.Application.DTOs.Messaging;
-using PutZige.Application.Interfaces;
-using PutZige.Domain.Entities;
-using PutZige.Infrastructure.Data;
 using Xunit;
 
 namespace PutZige.API.Tests.Integration.Performance
@@ -102,37 +103,66 @@ namespace PutZige.API.Tests.Integration.Performance
             using (var scope = Factory.Services.CreateScope())
             {
                 var ctx = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                ctx.Users.Add(new User { Id = sender, Email = "sender@test.com", Username = "sender", PasswordHash = "hash_s", DisplayName = "Sender" });
-                ctx.Users.Add(new User { Id = receiver, Email = "receiver@test.com", Username = "receiver", PasswordHash = "hash_r", DisplayName = "Receiver" });
+                ctx.Users.Add(new User
+                {
+                    Id = sender,
+                    Email = "sender@test.com",
+                    Username = "sender",
+                    PasswordHash = "hash_s",
+                    PasswordSalt = "salt_s",
+                    DisplayName = "Sender",
+                    IsActive = true,
+                    IsEmailVerified = true
+                });
+                ctx.Users.Add(new User
+                {
+                    Id = receiver,
+                    Email = "receiver@test.com",
+                    Username = "receiver",
+                    PasswordHash = "hash_r",
+                    PasswordSalt = "salt_r",
+                    DisplayName = "Receiver",
+                    IsActive = true,
+                    IsEmailVerified = true
+                });
                 await ctx.SaveChangesAsync();
+            }
+
+            // Create conversation between sender and receiver
+            Guid conversationId;
+            using (var scope = Factory.Services.CreateScope())
+            {
+                var convRepo = scope.ServiceProvider.GetRequiredService<IConversationRepository>();
+                var conv = await convRepo.GetOrCreateDirectConversationAsync(sender, receiver);
+                conversationId = conv.Id;
             }
 
             // Act: Send 100 messages concurrently
             var tasks = Enumerable.Range(0, 100).Select(i => Task.Run(async () =>
             {
-                var messageRequest = new SendMessageRequest(receiver, $"Concurrent message {i}");
+                var messageRequest = new SendMessageRequest(conversationId, $"Concurrent message {i}");
                 var httpRequest = new HttpRequestMessage(HttpMethod.Post, TestApiEndpoints.Messages)
                 {
-                    Content = JsonContent.Create(messageRequest, options: new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })
+                    Content = JsonContent.Create(messageRequest,
+                        options: new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })
                 };
-                httpRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", sender.ToString());
-                
+                httpRequest.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", sender.ToString());
+
                 var response = await Client.SendAsync(httpRequest);
                 response.EnsureSuccessStatusCode();
             }));
 
             await Task.WhenAll(tasks);
 
-            // Assert: Verify all messages were persisted using optimized read-only query
+            // Assert
             using (var scope = Factory.Services.CreateScope())
             {
                 var ctx = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                
-                // Use AsNoTracking for read-only count query - no need to track entities for verification
                 var count = await ctx.Messages
                     .AsNoTracking()
                     .CountAsync(m => m.SenderId == sender && m.ReceiverId == receiver);
-                
+
                 count.Should().Be(100, "all concurrent messages should be persisted without data loss");
             }
         }

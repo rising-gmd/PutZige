@@ -84,6 +84,9 @@ namespace PutZige.Application.Common.Messages
             public const string PageNumberOutOfRange = "pageNumber must be greater than zero";
             public const string PageSizeOutOfRange = "pageSize must be between 1 and the configured maximum";
             public const string SenderNotFound = "Sender not found";
+            public const string ConversationNotFound = "Conversation not found";
+            public const string ConversationIdRequired = "ConversationId is required";
+            public const string NotAParticipant = "Not a participant of the conversation";
         }
 
         public static class Email

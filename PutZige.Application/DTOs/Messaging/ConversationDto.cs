@@ -4,6 +4,8 @@ namespace PutZige.Application.DTOs.Messaging;
 
 public sealed class ConversationDto
 {
+    // Conversation identifier for explicit conversation model
+    public Guid ConversationId { get; init; }
     public Guid UserId { get; init; }
     public string Username { get; init; } = string.Empty;
     public string? DisplayName { get; init; }

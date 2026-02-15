@@ -19,12 +19,14 @@ namespace PutZige.Domain.Interfaces
         /// <summary>
         /// Get paginated conversation history between two users.
         /// </summary>
+        // New API: conversation-based history
         Task<(IEnumerable<PutZige.Domain.DTOs.MessageProjection> Messages, long TotalCount)> GetConversationHistoryAsync(
-            Guid userId, 
-            Guid otherUserId, 
+            Guid conversationId, 
             int pageNumber, 
             int pageSize, 
             CancellationToken ct = default);
+
+        // (legacy user-to-user overload removed)
 
         /// <summary>
         /// Get total unread message count for a user across all conversations.

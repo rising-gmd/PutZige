@@ -16,12 +16,15 @@ namespace PutZige.API.Controllers
     {
         private readonly IMessagingService _messagingService;
         private readonly ILogger<MessagesController> _logger;
+        private readonly PutZige.Application.Interfaces.ICurrentUserService _currentUserService;
 
         public MessagesController(
             IMessagingService messagingService,
+            PutZige.Application.Interfaces.ICurrentUserService currentUserService,
             ILogger<MessagesController> logger)
         {
             _messagingService = messagingService ?? throw new ArgumentNullException(nameof(messagingService));
+            _currentUserService = currentUserService ?? throw new ArgumentNullException(nameof(currentUserService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -35,10 +38,12 @@ namespace PutZige.API.Controllers
             [FromBody] SendMessageRequest request,
             CancellationToken ct)
         {
-            var response = await _messagingService.SendMessageAsync(
-                request.ReceiverId,
-                request.MessageText,
-                ct);
+            // Require explicit ConversationId
+            if (request.ConversationId == Guid.Empty)
+                return BadRequest("ConversationId is required");
+
+            var senderId = _currentUserService.GetUserId();
+            var response = await _messagingService.SendMessageAsync(request.ConversationId, request.MessageText, senderId, ct);
 
             return Created(response, ResponseCodes.MESSAGE_SENT, SuccessMessages.Messaging.MessageSent);
         }
