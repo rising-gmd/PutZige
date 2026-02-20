@@ -16,6 +16,11 @@ namespace PutZige.Application.Common.Messages
             public const string InvalidRefreshToken = "Invalid or expired refresh token.";
         }
 
+        public static class Users
+        {
+            public const string UserNotFound = "User not found";
+        }
+
         public static class Validation
         {
             public const string ValidationFailed = "Validation failed. Please check your input.";

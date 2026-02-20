@@ -58,5 +58,12 @@ namespace PutZige.Application.Interfaces
         /// <exception cref="AppException">When message not found</exception>
         /// <exception cref="KeyNotFoundException">When message doesn't exist</exception>
         Task MarkMessageAsReadAsync(Guid messageId, CancellationToken ct = default);
+
+        /// <summary>
+        /// Marks all messages in a 1-on-1 conversation as read for the current user.
+        /// </summary>
+        /// <param name="conversationId">Conversation identifier</param>
+        /// <param name="ct">Cancellation token</param>
+        Task MarkConversationAsReadAsync(Guid conversationId, CancellationToken ct = default);
     }
 }

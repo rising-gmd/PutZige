@@ -13,6 +13,14 @@ public class MessagingMappingProfile : Profile
             .ForMember(d => d.ReceiverUsername, opt => opt.MapFrom(s => s.Receiver != null ? s.Receiver.Username : string.Empty));
 
         CreateMap<Message, SendMessageResponse>()
-            .ConstructUsing(s => new SendMessageResponse(s.Id, s.SenderId, s.ReceiverId, s.MessageText, s.SentAt));
+            .ConstructUsing(s => new SendMessageResponse
+            {
+                MessageId = s.Id,
+                ConversationId = s.ConversationId ?? Guid.Empty,
+                SenderId = s.SenderId,
+                ReceiverId = s.ReceiverId,
+                MessageText = s.MessageText,
+                SentAt = s.SentAt
+            });
     }
 }

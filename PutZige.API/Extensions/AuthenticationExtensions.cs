@@ -1,11 +1,12 @@
-using System;
-using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using PutZige.Application.Common.Constants;
 using PutZige.Application.Settings;
+using System;
+using System.Text;
 
 namespace PutZige.API.Extensions
 {
@@ -59,18 +60,30 @@ namespace PutZige.API.Extensions
                     {
                         OnMessageReceived = context =>
                         {
-                            var accessToken = context.Request.Query["access_token"].ToString();
                             var path = context.HttpContext.Request.Path;
-                            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments(PutZige.Application.Common.Constants.SignalRConstants.HubRoute))
+
+                            // SignalR: Check query string first (for fallback)
+                            if (path.StartsWithSegments(SignalRConstants.HubRoute))
                             {
-                                context.Token = accessToken;
-                                return System.Threading.Tasks.Task.CompletedTask;
+                                var accessToken = context.Request.Query["access_token"].ToString();
+                                if (!string.IsNullOrEmpty(accessToken))
+                                {
+                                    context.Token = accessToken;
+                                    return System.Threading.Tasks.Task.CompletedTask;
+                                }
+
+                                // SignalR with cookies: Read from cookie
+                                if (context.Request.Cookies.TryGetValue(CookieConstants.ACCESS_TOKEN, out var cookieToken))
+                                {
+                                    context.Token = cookieToken;
+                                    return System.Threading.Tasks.Task.CompletedTask;
+                                }
                             }
 
-                        // Fall back to accessToken cookie for regular HTTP API calls
-                            if (context.Request.Cookies.TryGetValue(PutZige.Application.Common.Constants.CookieConstants.ACCESS_TOKEN, out var cookieToken) && !string.IsNullOrWhiteSpace(cookieToken))
+                            // Regular API calls: Read from cookie
+                            if (context.Request.Cookies.TryGetValue(CookieConstants.ACCESS_TOKEN, out var token))
                             {
-                                context.Token = cookieToken;
+                                context.Token = token;
                             }
 
                             return System.Threading.Tasks.Task.CompletedTask;

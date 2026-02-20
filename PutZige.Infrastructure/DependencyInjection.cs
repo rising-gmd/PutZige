@@ -70,6 +70,8 @@ public static class DependencyInjection
         services.AddScoped<IMessageRepository, MessageRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IConversationRepository, ConversationRepository>();
+        // Register Conversation Services
+        services.AddScoped<PutZige.Application.Interfaces.IConversationService, PutZige.Application.Services.ConversationService>();
 
         // JWT settings and token service
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));

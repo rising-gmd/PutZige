@@ -93,15 +93,15 @@ namespace PutZige.Application.Services
             Guid senderId,
             CancellationToken ct = default)
         {
-            // Get conversation and verify sender is participant
-            var conversation = await _conversationRepository.GetByIdWithParticipantsAsync(conversationId, ct).ConfigureAwait(false);
+            var conversation = await _conversationRepository
+                .GetByIdWithParticipantsAsync(conversationId, ct)
+                .ConfigureAwait(false);
             if (conversation == null)
                 throw new KeyNotFoundException("Conversation not found");
 
             if (!conversation.Participants.Any(p => p.UserId == senderId))
                 throw new UnauthorizedAccessException("Not a participant");
 
-            // For direct conversations, receiver is the other participant
             var receiverId = conversation.Participants.First(p => p.UserId != senderId).UserId;
 
             ValidateMessageRequest(senderId, receiverId, messageText);
@@ -205,6 +205,35 @@ namespace PutZige.Application.Services
             await _realTimeNotifier
                 .TryNotifyMessageReadAsync(message.SenderId, messageId, message.ReadAt.Value)
                 .ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Marks all messages in a direct 1-on-1 conversation as read for the current user.
+        /// </summary>
+        public async Task MarkConversationAsReadAsync(Guid conversationId, CancellationToken ct = default)
+        {
+            var currentUserId = _currentUserService.GetUserId();
+
+            var conversation = await _conversationRepository
+                .GetByIdWithParticipantsAsync(conversationId, ct)
+                .ConfigureAwait(false);
+
+            if (conversation == null)
+                throw new KeyNotFoundException("Conversation not found");
+
+            if (!conversation.Participants.Any(p => p.UserId == currentUserId))
+                throw new UnauthorizedAccessException("Not a participant");
+
+            var otherParticipant = conversation.Participants.First(p => p.UserId != currentUserId);
+            var otherUserId = otherParticipant.UserId;
+
+            var rowsUpdated = await _dapperMessageRepository
+                .MarkConversationAsReadAsync(currentUserId, otherUserId, ct)
+                .ConfigureAwait(false);
+
+            _logger.LogInformation(
+                "Marked conversation as read - ConversationId: {ConversationId} RowsUpdated: {RowsUpdated}",
+                conversationId, rowsUpdated);
         }
 
         // ── Private helpers ──────────────────────────────────────────────────

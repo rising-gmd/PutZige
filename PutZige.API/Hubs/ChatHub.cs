@@ -99,6 +99,8 @@ public class ChatHub : Hub
 
                     if (_connectionMapping.TryGetConnection(participant.UserId, out var connectionId))
                     {
+                        _logger?.LogInformation("Sending to UserId: {UserId}, ConnectionId: {ConnectionId}", participant.UserId, connectionId);
+
                         await Clients.Client(connectionId).SendAsync(SignalRConstants.Events.ReceiveMessage, response, ct).ConfigureAwait(false);
                         try
                         {
@@ -108,6 +110,10 @@ public class ChatHub : Hub
                         {
                             _logger?.LogWarning(ex, "Failed to mark message delivered for MessageId: {MessageId}", response.MessageId);
                         }
+                    }
+                    else
+                    {
+                        _logger?.LogWarning("Receiver NOT CONNECTED - UserId: {UserId}", participant.UserId);
                     }
                 }
             }
