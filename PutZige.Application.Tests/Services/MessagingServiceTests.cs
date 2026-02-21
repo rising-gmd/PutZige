@@ -48,7 +48,15 @@ public class MessagingServiceTests
         _mockDateTimeProvider.Setup(d => d.UtcNow).Returns(() => DateTime.UtcNow);
 
         _mockMapper.Setup(m => m.Map<SendMessageResponse>(It.IsAny<Message>()))
-            .Returns((Message msg) => new SendMessageResponse(msg.Id, msg.SenderId, msg.ReceiverId, msg.MessageText, msg.SentAt));
+            .Returns((Message msg) => new SendMessageResponse
+            {
+                MessageId = msg.Id,
+                ConversationId = msg.ConversationId ?? Guid.Empty,
+                SenderId = msg.SenderId,
+                ReceiverId = msg.ReceiverId,
+                MessageText = msg.MessageText,
+                SentAt = msg.SentAt
+            });
         _mockMapper.Setup(m => m.Map<MessageDto>(It.IsAny<Message>()))
             .Returns((Message msg) => new MessageDto { Id = msg.Id, MessageText = msg.MessageText, SenderId = msg.SenderId, ReceiverId = msg.ReceiverId, SentAt = msg.SentAt });
 

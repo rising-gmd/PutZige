@@ -29,6 +29,33 @@ namespace PutZige.Infrastructure.Repositories.Dapper
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
+        public async Task<int> GetUnreadCountForConversationAsync(Guid conversationId, Guid receiverId, CancellationToken ct = default)
+        {
+            if (conversationId == Guid.Empty || receiverId == Guid.Empty) return 0;
+
+            var conn = _context.GetOpenConnection();
+
+            try
+            {
+                var param = new { ConversationId = conversationId, ReceiverId = receiverId };
+                var result = await conn.ExecuteScalarAsync<long>(
+                    new CommandDefinition(MessageQueries.GET_UNREAD_COUNT_FOR_CONVERSATION, param, cancellationToken: ct))
+                    .ConfigureAwait(false);
+
+                return (int)result;
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("GetUnreadCountForConversationAsync canceled for conversation {ConversationId} receiver {ReceiverId}", conversationId, receiverId);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GetUnreadCountForConversationAsync failed for conversation {ConversationId} receiver {ReceiverId}", conversationId, receiverId);
+                throw;
+            }
+        }
+
         // legacy user-to-user overload removed
 
         public async Task<IEnumerable<ConversationProjection>> GetConversationsForUserAsync(Guid userId, int limit, CancellationToken ct = default)

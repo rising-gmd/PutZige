@@ -154,6 +154,17 @@ public static class MessageQueries
           AND IsDeleted = 0;";
 
     /// <summary>
+    /// Get unread message count for a specific receiver in a specific conversation.
+    /// </summary>
+    public const string GET_UNREAD_COUNT_FOR_CONVERSATION =
+        @"SELECT COUNT_BIG(*)
+        FROM Messages WITH (NOLOCK)
+        WHERE ConversationId = @ConversationId
+          AND ReceiverId = @ReceiverId
+          AND ReadAt IS NULL
+          AND IsDeleted = 0";
+
+    /// <summary>
     /// Mark all messages from a specific sender as read (bulk operation).
     /// </summary>
     public const string MARK_CONVERSATION_AS_READ =

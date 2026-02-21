@@ -18,16 +18,19 @@ public class ChatHub : Hub
     private readonly ILogger<ChatHub>? _logger;
     private readonly IConnectionMappingService _connectionMapping;
     private readonly IConversationRepository _conversationRepository;
+    private readonly PutZige.Domain.Interfaces.IDapperMessageRepository _dapperMessageRepository;
 
     public ChatHub(
         IMessagingService messagingService,
         IConnectionMappingService connectionMapping,
         IConversationRepository conversationRepository,
+        PutZige.Domain.Interfaces.IDapperMessageRepository dapperMessageRepository,
         ILogger<ChatHub>? logger = null)
     {
         _messagingService = messagingService ?? throw new ArgumentNullException(nameof(messagingService));
         _connectionMapping = connectionMapping ?? throw new ArgumentNullException(nameof(connectionMapping));
         _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
+        _dapperMessageRepository = dapperMessageRepository ?? throw new ArgumentNullException(nameof(dapperMessageRepository));
         _logger = logger;
     }
 
@@ -100,8 +103,30 @@ public class ChatHub : Hub
                     if (_connectionMapping.TryGetConnection(participant.UserId, out var connectionId))
                     {
                         _logger?.LogInformation("Sending to UserId: {UserId}, ConnectionId: {ConnectionId}", participant.UserId, connectionId);
+                        // Fetch fresh unread count from the database for the receiver
+                        int unreadCount = 0;
+                        try
+                        {
+                            unreadCount = await _dapperMessageRepository.GetUnreadCountForConversationAsync(conversationId, participant.UserId, ct).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.LogWarning(ex, "Failed to fetch unread count for ConversationId: {ConversationId} ReceiverId: {ReceiverId}", conversationId, participant.UserId);
+                            unreadCount = 0; // safe fallback
+                        }
 
-                        await Clients.Client(connectionId).SendAsync(SignalRConstants.Events.ReceiveMessage, response, ct).ConfigureAwait(false);
+                        var payload = new PutZige.Application.DTOs.Messaging.ReceiveMessagePayload
+                        {
+                            MessageId = response.MessageId,
+                            ConversationId = response.ConversationId,
+                            SenderId = response.SenderId,
+                            ReceiverId = response.ReceiverId,
+                            MessageText = response.MessageText,
+                            SentAt = response.SentAt,
+                            UnreadCount = unreadCount
+                        };
+
+                        await Clients.Client(connectionId).SendAsync(SignalRConstants.Events.ReceiveMessage, payload, ct).ConfigureAwait(false);
                         try
                         {
                             await _messagingService.MarkMessageAsDeliveredAsync(response.MessageId, ct).ConfigureAwait(false);

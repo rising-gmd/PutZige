@@ -34,6 +34,11 @@ namespace PutZige.Domain.Interfaces
         Task<long> GetTotalUnreadCountAsync(Guid userId, CancellationToken ct = default);
 
         /// <summary>
+        /// Get unread message count for a specific receiver in a specific conversation.
+        /// </summary>
+        Task<int> GetUnreadCountForConversationAsync(Guid conversationId, Guid receiverId, CancellationToken ct = default);
+
+        /// <summary>
         /// Mark all messages from a sender as read (bulk operation).
         /// </summary>
         Task<int> MarkConversationAsReadAsync(Guid userId, Guid otherUserId, CancellationToken ct = default);
