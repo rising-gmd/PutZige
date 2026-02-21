@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Threading.Tasks;
+using PutZige.Application.DTOs.Messaging;
 
 namespace PutZige.Application.Interfaces
 {
@@ -12,5 +13,6 @@ namespace PutZige.Application.Interfaces
         Task TryNotifyUserOfflineAsync(Guid userId);
         Task TryNotifyUserTypingAsync(Guid conversationId, Guid userId);
         Task TryNotifyUserStoppedTypingAsync(Guid conversationId, Guid userId);
+        Task TryNotifyConversationCreatedAsync(Guid recipientUserId, ConversationDto conversation);
     }
 }

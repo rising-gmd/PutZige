@@ -38,18 +38,15 @@ namespace PutZige.API.Controllers
         /// <param name="ct">Cancellation token</param>
         /// <returns>Conversation details including conversation ID</returns>
         [HttpPost]
-        [ProducesResponseType(typeof(ApiResponse<ConversationResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<ConversationDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<ActionResult<ApiResponse<ConversationResponse>>> CreateOrGetConversation(
+        public async Task<ActionResult<ApiResponse<ConversationDto>>> CreateOrGetConversation(
             [FromBody] CreateConversationRequest request,
             CancellationToken ct)
         {
-            var response = await _conversationService.GetOrCreateDirectConversationAsync(
-                request.OtherUserId,
-                ct).ConfigureAwait(false);
-
-            return Success(response, ResponseCodes.CONVERSATION_CREATED);
+            var dto = await _conversationService.GetOrCreateDirectConversationAsync(request.OtherUserId, ct).ConfigureAwait(false);
+            return Success(dto, ResponseCodes.CONVERSATION_CREATED);
         }
 
         /// <summary>

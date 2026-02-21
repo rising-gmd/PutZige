@@ -15,6 +15,7 @@ namespace PutZige.Application.Common.Constants
             public const string MessageRead = "MessageRead";
             public const string UserTyping = "UserTyping";
             public const string UserStoppedTyping = "UserStoppedTyping";
+            public const string ConversationCreated = "ConversationCreated";
             public const string Error = "Error";
         }
 

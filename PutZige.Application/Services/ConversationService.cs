@@ -20,21 +20,24 @@ public sealed class ConversationService : IConversationService
     private readonly IConversationRepository _conversationRepository;
     private readonly IUserRepository _userRepository;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IRealTimeNotifier _realTimeNotifier;
     private readonly ILogger<ConversationService> _logger;
 
     public ConversationService(
         IConversationRepository conversationRepository,
         IUserRepository userRepository,
         ICurrentUserService currentUserService,
+        IRealTimeNotifier realTimeNotifier,
         ILogger<ConversationService> logger)
     {
         _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
         _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
         _currentUserService = currentUserService ?? throw new ArgumentNullException(nameof(currentUserService));
+        _realTimeNotifier = realTimeNotifier ?? throw new ArgumentNullException(nameof(realTimeNotifier));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<ConversationResponse> GetOrCreateDirectConversationAsync(
+    public async Task<ConversationDto> GetOrCreateDirectConversationAsync(
         Guid otherUserId,
         CancellationToken ct = default)
     {
@@ -58,14 +61,21 @@ public sealed class ConversationService : IConversationService
             "Conversation retrieved/created - ConversationId: {ConversationId}, Users: {User1}, {User2}",
             conversation.Id, currentUserId, otherUserId);
 
-        return new ConversationResponse
+        var dto = new ConversationDto
         {
             ConversationId = conversation.Id,
-            IsGroup = conversation.IsGroup,
-            LastActivity = conversation.LastActivity,
-            OtherUserId = otherUserId,
-            OtherUserDisplayName = otherUser.DisplayName ?? otherUser.Username
+            UserId = otherUser.Id,
+            Username = otherUser.Username,
+            DisplayName = otherUser.DisplayName,
+            ProfilePictureUrl = otherUser.ProfilePictureUrl,
+            IsOnline = false,
+            LastMessage = null,
+            UnreadCount = 0,
+            LastActivity = conversation.LastActivity
         };
+
+        await _realTimeNotifier.TryNotifyConversationCreatedAsync(otherUserId, dto).ConfigureAwait(false);
+        return dto;
     }
 
     public async Task<ConversationResponse> GetConversationByIdAsync(

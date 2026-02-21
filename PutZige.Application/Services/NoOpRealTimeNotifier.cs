@@ -2,6 +2,7 @@
 using System;
 using System.Threading.Tasks;
 using PutZige.Application.Interfaces;
+using PutZige.Application.DTOs.Messaging;
 
 namespace PutZige.Application.Services
 {
@@ -13,5 +14,6 @@ namespace PutZige.Application.Services
         public Task TryNotifyUserOfflineAsync(Guid userId) => Task.CompletedTask;
         public Task TryNotifyUserTypingAsync(Guid conversationId, Guid userId) => Task.CompletedTask;
         public Task TryNotifyUserStoppedTypingAsync(Guid conversationId, Guid userId) => Task.CompletedTask;
+        public Task TryNotifyConversationCreatedAsync(Guid recipientUserId, ConversationDto conversation) => Task.CompletedTask;
     }
 }

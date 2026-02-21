@@ -18,7 +18,7 @@ public interface IConversationService
     /// <param name="ct">Cancellation token</param>
     /// <returns>Conversation details</returns>
     /// <exception cref="KeyNotFoundException">When other user not found</exception>
-    Task<ConversationResponse> GetOrCreateDirectConversationAsync(
+    Task<ConversationDto> GetOrCreateDirectConversationAsync(
         Guid otherUserId,
         CancellationToken ct = default);
 
