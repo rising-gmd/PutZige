@@ -21,6 +21,7 @@ public sealed class ConversationService : IConversationService
     private readonly IUserRepository _userRepository;
     private readonly ICurrentUserService _currentUserService;
     private readonly IRealTimeNotifier _realTimeNotifier;
+    private readonly IConnectionMappingService _presenceService;
     private readonly ILogger<ConversationService> _logger;
 
     public ConversationService(
@@ -28,12 +29,14 @@ public sealed class ConversationService : IConversationService
         IUserRepository userRepository,
         ICurrentUserService currentUserService,
         IRealTimeNotifier realTimeNotifier,
+        IConnectionMappingService presenceService,
         ILogger<ConversationService> logger)
     {
         _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
         _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
         _currentUserService = currentUserService ?? throw new ArgumentNullException(nameof(currentUserService));
         _realTimeNotifier = realTimeNotifier ?? throw new ArgumentNullException(nameof(realTimeNotifier));
+        _presenceService = presenceService ?? throw new ArgumentNullException(nameof(presenceService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -61,21 +64,51 @@ public sealed class ConversationService : IConversationService
             "Conversation retrieved/created - ConversationId: {ConversationId}, Users: {User1}, {User2}",
             conversation.Id, currentUserId, otherUserId);
 
-        var dto = new ConversationDto
+        // Fetch current user profile and both users' online status in parallel
+        var currentUserTask = _userRepository.GetByIdAsync(currentUserId, ct);
+        var senderIsOnlineTask = Task.FromResult(_presenceService.TryGetConnection(currentUserId, out _));
+        var receiverIsOnlineTask = Task.FromResult(_presenceService.TryGetConnection(otherUserId, out _));
+
+        await Task.WhenAll(currentUserTask, senderIsOnlineTask, receiverIsOnlineTask).ConfigureAwait(false);
+
+        var currentUser = currentUserTask.Result;
+        var senderIsOnline = senderIsOnlineTask.Result;   // current user's online state
+        var receiverIsOnline = receiverIsOnlineTask.Result; // other user's online state
+
+        if (currentUser == null)
+            throw new KeyNotFoundException(ErrorMessages.Users.UserNotFound);
+
+        // DTO returned to the caller (sender) — reflects other user's info and whether that other user is online
+        var senderDto = new ConversationDto
         {
             ConversationId = conversation.Id,
             UserId = otherUser.Id,
             Username = otherUser.Username,
             DisplayName = otherUser.DisplayName,
             ProfilePictureUrl = otherUser.ProfilePictureUrl,
-            IsOnline = false,
+            IsOnline = receiverIsOnline,
             LastMessage = null,
             UnreadCount = 0,
             LastActivity = conversation.LastActivity
         };
 
-        await _realTimeNotifier.TryNotifyConversationCreatedAsync(otherUserId, dto).ConfigureAwait(false);
-        return dto;
+        // DTO to send to the other user via SignalR — contains current user's profile and current user's online state
+        var receiverDto = new ConversationDto
+        {
+            ConversationId = conversation.Id,
+            UserId = currentUser.Id,
+            Username = currentUser.Username,
+            DisplayName = currentUser.DisplayName,
+            ProfilePictureUrl = currentUser.ProfilePictureUrl,
+            IsOnline = senderIsOnline,
+            LastMessage = null,
+            UnreadCount = 0,
+            LastActivity = conversation.LastActivity
+        };
+
+        await _realTimeNotifier.TryNotifyConversationCreatedAsync(otherUserId, receiverDto).ConfigureAwait(false);
+
+        return senderDto;
     }
 
     public async Task<ConversationResponse> GetConversationByIdAsync(
