@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IMessagingService, MessagingService>();
+        services.AddScoped<IUserSettingsService, UserSettingsService>();
 
         // Time abstraction for testability (registered in infrastructure where implementation lives)
 

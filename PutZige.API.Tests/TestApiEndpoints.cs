@@ -25,5 +25,8 @@ namespace PutZige.API.Tests
         public const string MessageRead = "/api/v1/messages/{0}/read";
         public const string MessageMarkAsRead = "/api/v1/messages/{0}/mark-as-read";
         public const string MessageById = "/api/v1/messages/{0}";
+
+        // User settings
+        public const string UserSettingsPreferences = "/api/v1/users/me/settings/preferences";
     }
 }
