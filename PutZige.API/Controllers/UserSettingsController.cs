@@ -10,7 +10,7 @@ namespace PutZige.API.Controllers
 {
     [ApiController]
     [Route("api/v1/users/me/settings")]
-    public class UserSettingsController : ControllerBase
+    public class UserSettingsController : BaseApiController
     {
         private readonly IUserSettingsService _userSettingsService;
         private readonly ILogger<UserSettingsController> _logger;
