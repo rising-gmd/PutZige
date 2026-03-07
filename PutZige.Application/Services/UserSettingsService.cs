@@ -50,7 +50,8 @@ namespace PutZige.Application.Services
             var merged = new UserPreferences(
                 request.Preferences.TimeZoneId ?? existing.TimeZoneId,
                 request.Preferences.Theme ?? existing.Theme,
-                request.Preferences.Language ?? existing.Language
+                request.Preferences.Language ?? existing.Language,
+                request.Preferences.IsDarkMode ?? existing.IsDarkMode
             );
 
             if (user.Settings == null)
@@ -69,14 +70,15 @@ namespace PutZige.Application.Services
             _userRepository.Update(user);
             await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-            _logger.LogInformation("User preferences updated - UserId: {UserId} TimeZoneId: {TimeZoneId} Theme: {Theme} Language: {Language}",
-                userId, merged.TimeZoneId, merged.Theme, merged.Language);
+            _logger.LogInformation("User preferences updated - UserId: {UserId} TimeZoneId: {TimeZoneId} Theme: {Theme} Language: {Language} IsDarkMode: {IsDarkMode}",
+                userId, merged.TimeZoneId, merged.Theme, merged.Language, merged.IsDarkMode);
 
             return new UserPreferencesDto
             {
                 TimeZoneId = merged.TimeZoneId,
                 Theme = merged.Theme,
-                Language = merged.Language
+                Language = merged.Language,
+                IsDarkMode = merged.IsDarkMode
             };
         }
 
@@ -93,7 +95,8 @@ namespace PutZige.Application.Services
             {
                 TimeZoneId = prefs.TimeZoneId,
                 Theme = prefs.Theme,
-                Language = prefs.Language
+                Language = prefs.Language,
+                IsDarkMode = prefs.IsDarkMode
             };
         }
     }

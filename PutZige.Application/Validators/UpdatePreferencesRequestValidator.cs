@@ -7,7 +7,7 @@ namespace PutZige.Application.Validators
 {
     public class UpdatePreferencesRequestValidator : AbstractValidator<UpdatePreferencesRequest>
     {
-        private static readonly string[] AllowedThemes = new[] { "system", "light", "dark" };
+        private static readonly string[] AllowedThemes = new[] { "default", "rose", "forest", "ocean", "sunset", "lavender" };
 
         public UpdatePreferencesRequestValidator()
         {

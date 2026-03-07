@@ -26,7 +26,7 @@ namespace PutZige.Application.Tests.Validators
             {
                 Preferences = new UserPreferencesPatchDto
                 {
-                    Theme = "dark",
+                    Theme = "rose",
                     Language = "en"
                 }
             };
@@ -59,7 +59,7 @@ namespace PutZige.Application.Tests.Validators
             {
                 Preferences = new UserPreferencesPatchDto
                 {
-                    Theme = "dark",
+                    Theme = "rose",
                     Language = "eng"
                 }
             };

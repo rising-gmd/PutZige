@@ -17,7 +17,7 @@ public static class DependencyInjection
         var assembly = Assembly.GetExecutingAssembly();
 
         // AutoMapper - scan this assembly for Profile classes
-        services.AddAutoMapper(assembly);
+        IServiceCollection serviceCollection = services.AddAutoMapper(assembly);
 
         // Register FluentValidation validators from this assembly
         services.AddValidatorsFromAssembly(assembly);

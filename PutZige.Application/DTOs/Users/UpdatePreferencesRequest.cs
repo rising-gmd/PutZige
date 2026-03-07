@@ -19,5 +19,8 @@ namespace PutZige.Application.DTOs.Users
 
         [JsonPropertyName("language")]
         public string? Language { get; set; }
+
+        [JsonPropertyName("isDarkMode")]
+        public bool? IsDarkMode { get; set; }
     }
 }

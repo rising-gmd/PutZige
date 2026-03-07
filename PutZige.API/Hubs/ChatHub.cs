@@ -84,7 +84,7 @@ public class ChatHub : Hub
         await base.OnDisconnectedAsync(exception);
     }
 
-    public async Task SendMessage(Guid conversationId, string messageText)
+    public async Task SendMessage(Guid conversationId, string messageText, string? tempId = null)
     {
         var ct = Context.ConnectionAborted;
         try
@@ -143,7 +143,8 @@ public class ChatHub : Hub
                 }
             }
 
-            await Clients.Caller.SendAsync(SignalRConstants.Events.MessageSent, response, ct).ConfigureAwait(false);
+            var ack = string.IsNullOrWhiteSpace(tempId) ? response : response with { TempId = tempId };
+            await Clients.Caller.SendAsync(SignalRConstants.Events.MessageSent, ack, ct).ConfigureAwait(false);
         }
         catch (KeyNotFoundException ex)
         {

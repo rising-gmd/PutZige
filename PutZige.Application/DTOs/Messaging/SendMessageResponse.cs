@@ -21,4 +21,7 @@ public record SendMessageResponse
 
     [JsonPropertyName("sentAt")]
     public DateTime SentAt { get; init; }
+
+    [JsonPropertyName("tempId")]
+    public string? TempId { get; init; }
 }

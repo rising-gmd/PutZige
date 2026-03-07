@@ -1,4 +1,5 @@
 #nullable enable
+using System.Text.Json.Serialization;
 
 namespace PutZige.Application.DTOs.Users
 {
@@ -7,5 +8,8 @@ namespace PutZige.Application.DTOs.Users
         public string TimeZoneId { get; init; } = null!;
         public string Theme { get; init; } = null!;
         public string Language { get; init; } = null!;
+
+        [JsonPropertyName("isDarkMode")]
+        public bool IsDarkMode { get; set; }
     }
 }
