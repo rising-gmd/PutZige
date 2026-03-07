@@ -65,6 +65,20 @@ namespace PutZige.Infrastructure.Data.Configurations
                 .HasDatabaseName("IX_Messages_ConversationId_SentAt")
                 .IsDescending(false, true)
                 .HasFilter("[IsDeleted] = 0");
+
+            // New message fields defaults
+            builder.Property(m => m.IsForwarded).HasDefaultValue(false);
+            builder.Property(m => m.IsEdited).HasDefaultValue(false);
+
+            // ReplyTo relationship (self reference)
+            builder.HasOne(m => m.ReplyTo)
+                .WithMany()
+                .HasForeignKey(m => m.ReplyToId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            builder.HasIndex(m => m.ReplyToId)
+                .HasDatabaseName("IX_Messages_ReplyToId")
+                .HasFilter("[ReplyToId] IS NOT NULL");
         }
     }
 }

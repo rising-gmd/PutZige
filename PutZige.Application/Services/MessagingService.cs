@@ -158,11 +158,20 @@ namespace PutZige.Application.Services
                 {
                     Id = p.Id,
                     SenderId = p.SenderId,
+                    SenderUsername = p.SenderUsername ?? string.Empty,
                     ReceiverId = p.ReceiverId,
+                    ReceiverUsername = p.ReceiverUsername ?? string.Empty,
                     MessageText = p.MessageText,
                     SentAt = p.SentAt,
                     DeliveredAt = p.DeliveredAt,
-                    ReadAt = p.ReadAt
+                    ReadAt = p.ReadAt,
+                    IsForwarded = p.IsForwarded,
+                    IsEdited = p.IsEdited,
+                    EditedAt = p.EditedAt,
+                    IsDeleted = p.IsDeleted,
+                    ReplyToId = p.ReplyToId,
+                    ReplyToText = p.ReplyToText,
+                    ReplyToSenderName = p.ReplyToSenderName
                 })
                 .ToList();
 

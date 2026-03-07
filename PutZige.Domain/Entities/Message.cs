@@ -22,5 +22,12 @@ namespace PutZige.Domain.Entities
     
     // Attachments for this message
     public ICollection<MessageAttachment> Attachments { get; set; } = new List<MessageAttachment>();
+        
+        // New fields
+        public bool IsForwarded { get; set; } = false;
+        public Guid? ReplyToId { get; set; }
+        public Message? ReplyTo { get; set; }
+        public bool IsEdited { get; set; } = false;
+        public DateTime? EditedAt { get; set; }
     }
 }

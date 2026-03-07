@@ -87,17 +87,24 @@ public static class MessageQueries
     // New: Get conversation history by ConversationId
     public const string GET_CONVERSATION_HISTORY_BY_ID =
         @"SELECT 
-            m.Id, m.SenderId, m.ReceiverId, m.MessageText,
-            m.SentAt, m.DeliveredAt, m.ReadAt,
-            s.Username AS SenderUsername,
-            r.Username AS ReceiverUsername
-        FROM Messages m WITH (INDEX(IX_Messages_ConversationId_SentAt))
-        INNER JOIN Users s WITH (NOLOCK) ON s.Id = m.SenderId
-        INNER JOIN Users r WITH (NOLOCK) ON r.Id = m.ReceiverId
-        WHERE m.ConversationId = @ConversationId
-          AND m.IsDeleted = 0
-        ORDER BY m.SentAt DESC
-        OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
+    m.Id, m.SenderId, m.ReceiverId,
+    CASE WHEN m.IsDeleted = 1 THEN '' ELSE m.MessageText END AS MessageText,
+    m.SentAt, m.DeliveredAt, m.ReadAt,
+    m.IsForwarded, m.IsEdited, m.EditedAt, m.IsDeleted,
+    m.ReplyToId,
+    LEFT(rm.MessageText, 100) AS ReplyToText,
+    ru.DisplayName AS ReplyToSenderName,
+    s.Username AS SenderUsername,
+    r.Username AS ReceiverUsername
+FROM Messages m WITH (INDEX(IX_Messages_ConversationId_SentAt))
+INNER JOIN Users s WITH (NOLOCK) ON s.Id = m.SenderId
+INNER JOIN Users r WITH (NOLOCK) ON r.Id = m.ReceiverId
+LEFT JOIN Messages rm WITH (NOLOCK) ON rm.Id = m.ReplyToId
+LEFT JOIN Users ru WITH (NOLOCK) ON ru.Id = rm.SenderId
+WHERE m.ConversationId = @ConversationId
+  AND m.IsDeleted = 0
+ORDER BY m.SentAt DESC
+OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
 
     public const string GET_CONVERSATION_COUNT_BY_ID =
         @"SELECT COUNT_BIG(*)
