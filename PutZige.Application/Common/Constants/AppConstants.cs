@@ -80,6 +80,12 @@
             public const int DefaultPageSize = 50;
             public const int MaxPageSize = 100;
             public const int ConversationListLimit = 100;  // ← add this
+
+            // Message attachment related limits
+            public const int MaxAttachmentFileNameLength = 255;
+            public const int MaxAttachmentMimeTypeLength = 100;
+            public const int MaxAttachmentTypeLength = 50;
+            public const int MaxAttachmentCaptionLength = 500;
         }
     }
 }

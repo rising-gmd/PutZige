@@ -32,6 +32,11 @@ public class AppDbContext : DbContext
     public DbSet<Message> Messages => Set<Message>();
 
     /// <summary>
+    /// Message attachments table set.
+    /// </summary>
+    public DbSet<MessageAttachment> MessageAttachments => Set<MessageAttachment>();
+
+    /// <summary>
     /// Conversations table set.
     /// </summary>
     public DbSet<Conversation> Conversations => Set<Conversation>();

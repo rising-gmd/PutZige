@@ -19,5 +19,8 @@ namespace PutZige.Domain.Entities
 
         public User? Sender { get; set; }
         public User? Receiver { get; set; }
+    
+    // Attachments for this message
+    public ICollection<MessageAttachment> Attachments { get; set; } = new List<MessageAttachment>();
     }
 }
