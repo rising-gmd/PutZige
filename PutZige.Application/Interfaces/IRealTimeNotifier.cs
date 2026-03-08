@@ -9,6 +9,7 @@ namespace PutZige.Application.Interfaces
     {
         Task TryNotifyMessageDeliveredAsync(Guid recipientUserId, Guid messageId, DateTime deliveredAt);
         Task TryNotifyMessageReadAsync(Guid recipientUserId, Guid messageId, DateTime readAt);
+        Task TryNotifyMessageEditedAsync(Guid recipientUserId, Guid messageId, string newText, DateTime editedAt);
         Task TryNotifyUserOnlineAsync(Guid userId);
         Task TryNotifyUserOfflineAsync(Guid userId);
         Task TryNotifyUserTypingAsync(Guid conversationId, Guid userId);

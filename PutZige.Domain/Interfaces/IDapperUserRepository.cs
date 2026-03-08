@@ -31,6 +31,11 @@ public interface IDapperUserRepository
         CancellationToken ct = default);
 
     /// <summary>
+    /// Update the UserSessions row for the specified user with online status and last active timestamp.
+    /// </summary>
+    Task UpdateSessionOnlineStatusAsync(Guid userId, bool isOnline, DateTime lastActiveAt, CancellationToken ct = default);
+
+    /// <summary>
     /// Get recent contacts (users chatted with in last N days).
     /// </summary>
     Task<IEnumerable<UserSearchProjection>> GetRecentContactsAsync(

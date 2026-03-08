@@ -29,6 +29,21 @@ namespace PutZige.API.Controllers
         }
 
         /// <summary>
+        /// Edit an existing message's text. Only the original sender may edit.
+        /// </summary>
+        [HttpPut("{messageId}")]
+        [EnableRateLimiting("api-general")]
+        [ProducesResponseType(typeof(ApiResponse<MessageDto>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<ApiResponse<MessageDto>>> EditMessage(
+            Guid messageId,
+            [FromBody] EditMessageRequest request,
+            CancellationToken ct)
+        {
+            var result = await _messagingService.EditMessageAsync(messageId, request.MessageText, ct).ConfigureAwait(false);
+            return Success(result, ResponseCodes.SUCCESS);
+        }
+
+        /// <summary>
         /// Sends a message to another user.
         /// </summary>
         [HttpPost]

@@ -22,5 +22,6 @@ public record MessageDto
     public bool IsEdited { get; init; }
     public DateTime? EditedAt { get; init; }
     public bool IsDeleted { get; init; }
+    public bool IsStarred { get; init; }
     public List<MessageAttachmentDto> Attachments { get; init; } = new();
 }

@@ -13,6 +13,7 @@ namespace PutZige.Application.Common.Constants
             public const string MessageSent = "MessageSent";
             public const string MessageDelivered = "MessageDelivered";
             public const string MessageRead = "MessageRead";
+            public const string MessageEdited = "MessageEdited";
             public const string UserTyping = "UserTyping";
             public const string UserStoppedTyping = "UserStoppedTyping";
             public const string ConversationCreated = "ConversationCreated";

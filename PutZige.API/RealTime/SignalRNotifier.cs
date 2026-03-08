@@ -40,6 +40,16 @@ namespace PutZige.API.RealTime
             return Task.CompletedTask;
         }
 
+        public Task TryNotifyMessageEditedAsync(Guid recipientUserId, Guid messageId, string newText, DateTime editedAt)
+        {
+            if (_connectionMapping.TryGetConnection(recipientUserId, out var connectionId))
+            {
+                return _hubContext.Clients.Client(connectionId).SendAsync(SignalRConstants.Events.MessageEdited, new { MessageId = messageId, MessageText = newText, EditedAt = editedAt, IsEdited = true });
+            }
+
+            return Task.CompletedTask;
+        }
+
         public Task TryNotifyUserOnlineAsync(Guid userId)
         {
             return _hubContext.Clients.All.SendAsync(SignalRConstants.Events.UserOnline, new { UserId = userId, IsOnline = true, LastSeen = DateTime.UtcNow });

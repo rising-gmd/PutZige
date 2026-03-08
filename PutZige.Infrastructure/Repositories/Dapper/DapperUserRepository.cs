@@ -196,5 +196,29 @@ namespace PutZige.Infrastructure.Repositories.Dapper
                 throw;
             }
         }
+
+        public async Task UpdateSessionOnlineStatusAsync(Guid userId, bool isOnline, DateTime lastActiveAt, CancellationToken ct = default)
+        {
+            if (userId == Guid.Empty) return;
+
+            var conn = _context.GetOpenConnection();
+
+            try
+            {
+                var param = new { UserId = userId, IsOnline = isOnline, LastActiveAt = lastActiveAt };
+                await conn.ExecuteAsync(new CommandDefinition(UserQueries.UPDATE_USER_SESSION_ONLINE_STATUS, param, cancellationToken: ct)).ConfigureAwait(false);
+                _logger.LogInformation("Updated session online status for UserId: {UserId} IsOnline: {IsOnline}", userId, isOnline);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("UpdateSessionOnlineStatusAsync canceled for UserId: {UserId}", userId);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "UpdateSessionOnlineStatusAsync failed for UserId: {UserId}", userId);
+                throw;
+            }
+        }
     }
 }

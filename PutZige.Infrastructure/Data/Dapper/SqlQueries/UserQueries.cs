@@ -224,4 +224,18 @@ public static class UserQueries
             CASE WHEN us.IsOnline = 1 THEN 0 ELSE 1 END,
             u.CreatedAt DESC;
         """;
+
+    /// <summary>
+    /// Update the user's session online status and last active timestamp.
+    /// Parameterized: @UserId, @IsOnline, @LastActiveAt
+    /// Also updates UpdatedAt = @LastActiveAt for consistency.
+    /// </summary>
+    public const string UPDATE_USER_SESSION_ONLINE_STATUS =
+        """
+        UPDATE UserSessions
+        SET IsOnline     = @IsOnline,
+            LastActiveAt = @LastActiveAt,
+            UpdatedAt    = @LastActiveAt
+        WHERE UserId = @UserId;
+        """;
 }

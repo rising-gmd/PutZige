@@ -60,6 +60,15 @@ namespace PutZige.Application.Interfaces
         Task MarkMessageAsReadAsync(Guid messageId, CancellationToken ct = default);
 
         /// <summary>
+        /// Edits the text of an existing message sent by the current user.
+        /// </summary>
+        /// <param name="messageId">Message identifier</param>
+        /// <param name="newText">New message text</param>
+        /// <param name="ct">Cancellation token</param>
+        /// <returns>Updated message DTO</returns>
+        Task<MessageDto> EditMessageAsync(Guid messageId, string newText, CancellationToken ct = default);
+
+        /// <summary>
         /// Marks all messages in a 1-on-1 conversation as read for the current user.
         /// </summary>
         /// <param name="conversationId">Conversation identifier</param>

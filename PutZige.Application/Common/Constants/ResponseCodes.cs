@@ -26,6 +26,7 @@ namespace PutZige.Application.Common.Constants
         public const string TOO_MANY_RESEND_ATTEMPTS = "TOO_MANY_RESEND_ATTEMPTS";
 
         // General
+        public const string SUCCESS = "SUCCESS";
         public const string NOT_FOUND = "NOT_FOUND";
         public const string VALIDATION_FAILED = "VALIDATION_FAILED";
         public const string INTERNAL_SERVER_ERROR = "INTERNAL_SERVER_ERROR";

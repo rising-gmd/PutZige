@@ -19,18 +19,21 @@ public class ChatHub : Hub
     private readonly IConnectionMappingService _connectionMapping;
     private readonly IConversationRepository _conversationRepository;
     private readonly PutZige.Domain.Interfaces.IDapperMessageRepository _dapperMessageRepository;
+    private readonly PutZige.Domain.Interfaces.IDapperUserRepository _dapperUserRepository;
 
     public ChatHub(
         IMessagingService messagingService,
         IConnectionMappingService connectionMapping,
         IConversationRepository conversationRepository,
         PutZige.Domain.Interfaces.IDapperMessageRepository dapperMessageRepository,
+        PutZige.Domain.Interfaces.IDapperUserRepository dapperUserRepository,
         ILogger<ChatHub>? logger = null)
     {
         _messagingService = messagingService ?? throw new ArgumentNullException(nameof(messagingService));
         _connectionMapping = connectionMapping ?? throw new ArgumentNullException(nameof(connectionMapping));
         _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
         _dapperMessageRepository = dapperMessageRepository ?? throw new ArgumentNullException(nameof(dapperMessageRepository));
+        _dapperUserRepository = dapperUserRepository ?? throw new ArgumentNullException(nameof(dapperUserRepository));
         _logger = logger;
     }
 
@@ -47,6 +50,18 @@ public class ChatHub : Hub
             }
 
             _connectionMapping.Add(userId.Value, Context.ConnectionId);
+
+            // Update user's session online status in background; failures must not abort connection
+            try
+            {
+                var now = DateTime.UtcNow;
+                // Use the connection's aborted token so the update can be cancelled if connection is aborted
+                _ = _dapperUserRepository.UpdateSessionOnlineStatusAsync(userId.Value, true, now, Context.ConnectionAborted);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Failed to update online status for UserId: {UserId}", userId.Value);
+            }
 
             _logger?.LogInformation("User connected - UserId: {UserId}, ConnectionId: {ConnectionId}", userId.Value, Context.ConnectionId);
 
@@ -70,6 +85,17 @@ public class ChatHub : Hub
             if (userId.HasValue)
             {
                 _connectionMapping.Remove(userId.Value);
+
+                try
+                {
+                    var now = DateTime.UtcNow;
+                    // On disconnect we don't want cancellation to stop the update; use CancellationToken.None
+                    _ = _dapperUserRepository.UpdateSessionOnlineStatusAsync(userId.Value, false, now, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Failed to update offline status for UserId: {UserId}", userId.Value);
+                }
 
                 _logger?.LogInformation("User disconnected - UserId: {UserId}, ConnectionId: {ConnectionId}", userId.Value, Context.ConnectionId);
 

@@ -217,6 +217,50 @@ namespace PutZige.Application.Services
         }
 
         /// <summary>
+        /// Edit the text of an existing message. Only the original sender may edit.
+        /// </summary>
+        public async Task<MessageDto> EditMessageAsync(Guid messageId, string newText, CancellationToken ct = default)
+        {
+            var message = await GetMessageOrThrowAsync(messageId, ct).ConfigureAwait(false);
+
+            var currentUserId = _currentUserService.GetUserId();
+
+            if (message.SenderId != currentUserId)
+                throw new UnauthorizedAccessException(ErrorMessages.Messaging.UnauthorizedAccess);
+
+            if (message.IsDeleted)
+                throw new InvalidOperationException(ErrorMessages.General.ResourceNotFound);
+
+            if (string.IsNullOrWhiteSpace(newText))
+                throw new AppException(ResponseCodes.MESSAGE_TEXT_REQUIRED, ErrorMessages.Messaging.MessageTextRequired);
+
+            if (newText.Length > AppConstants.Messaging.MaxMessageLength)
+                throw new AppException(ResponseCodes.MESSAGE_TOO_LONG, ErrorMessages.Messaging.MessageTooLong);
+
+            message.MessageText = newText;
+            message.IsEdited = true;
+            message.EditedAt = _dateTimeProvider.UtcNow;
+
+            await _messageRepository.UpdateAsync(message, ct).ConfigureAwait(false);
+            await _unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
+
+            _logger.LogInformation("Message edited - MessageId: {MessageId}", messageId);
+
+            try
+            {
+                await _realTimeNotifier
+                    .TryNotifyMessageEditedAsync(message.ReceiverId, message.Id, message.MessageText, message.EditedAt!.Value)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to notify recipient about edited message - MessageId: {MessageId}", messageId);
+            }
+
+            return _mapper.Map<MessageDto>(message);
+        }
+
+        /// <summary>
         /// Marks all messages in a direct 1-on-1 conversation as read for the current user.
         /// </summary>
         public async Task MarkConversationAsReadAsync(Guid conversationId, CancellationToken ct = default)
